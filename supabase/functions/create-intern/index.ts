@@ -16,10 +16,21 @@ Deno.serve(async (req) => {
     const body = await req.json()
     if (!body.name || !body.email || !body.password) throw new Error('Nama, email, dan kata sandi wajib diisi')
     const service = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-    const { data: created, error: createError } = await service.auth.admin.createUser({ email: body.email, password: body.password, email_confirm: true })
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: body.email,
+      password: body.password,
+      // Account dapat langsung dipakai login tanpa menunggu konfirmasi email.
+      email_confirm: true,
+      user_metadata: {
+        name: body.name,
+        department: body.department || '',
+        internship_start: body.internship_start || '',
+        internship_end: body.internship_end || '',
+      },
+    })
     if (createError) throw createError
-    const { error: profileError } = await service.from('profiles').insert({ id: created.user.id, name: body.name, email: body.email, role: 'intern', department: body.department || null, internship_start: body.internship_start || null, internship_end: body.internship_end || null, is_active: true })
-    if (profileError) { await service.auth.admin.deleteUser(created.user.id); throw profileError }
+    // Trigger `on_auth_user_created` pada schema.sql membuat profil intern.
+    // Metadata di atas memastikan nama dan data magang ikut tersimpan.
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) { return Response.json({ error: error.message }, { status: 400, headers: corsHeaders }) }
 })
