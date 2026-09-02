@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
       internship_start: body.internship_start || null, internship_end: body.internship_end || null,
     }).eq('id', body.id)
     if (profileError) throw profileError
+    await service.from('audit_logs').insert({ actor_id: user.id, action: 'update_intern', target_id: body.id, details: { email: body.email, department: body.department || null } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400, headers: corsHeaders })

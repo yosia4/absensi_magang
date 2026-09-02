@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
 
     const { error } = await service.auth.admin.deleteUser(id)
     if (error) throw error
+    await service.from('audit_logs').insert({ actor_id: user.id, action: 'delete_intern', target_id: id, details: { role: 'intern' } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400, headers: corsHeaders })

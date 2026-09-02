@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
     if (createError) throw createError
     // Trigger `on_auth_user_created` pada schema.sql membuat profil intern.
     // Metadata di atas memastikan nama dan data magang ikut tersimpan.
+    await service.from('audit_logs').insert({ actor_id: user.id, action: 'create_intern', target_id: created.user.id, details: { email: body.email, department: body.department || null } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) { return Response.json({ error: error.message }, { status: 400, headers: corsHeaders }) }
 })
