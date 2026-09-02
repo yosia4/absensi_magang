@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     if (body.password) update.password = body.password
     const { error: authError } = await service.auth.admin.updateUserById(user.id, update)
     if (authError) throw authError
-    const { error: profileError } = await service.from('profiles').update({ name: body.name, email: body.email }).eq('id', user.id)
+    const { error: profileError } = await service.from('profiles').update({ name: body.name, email: body.email, photo_url: body.photo_url || null }).eq('id', user.id)
     if (profileError) throw profileError
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) { return Response.json({ error: error.message }, { status: 400, headers: corsHeaders }) }
