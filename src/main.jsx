@@ -12,6 +12,7 @@ import {
   Camera,
   Check,
   ChevronLeft,
+  ChevronRight,
   Clock3,
   Download,
   FileText,
@@ -58,7 +59,8 @@ const sampleRows = [
     in: "07:55",
     out: "16:02",
     status: "Hadir",
-    dept: "Layanan Digital",
+    university: "Universitas Indonesia",
+    major: "Ilmu Komputer",
   },
   {
     name: "Budi Santoso",
@@ -66,7 +68,8 @@ const sampleRows = [
     in: "08:12",
     out: "-",
     status: "Terlambat",
-    dept: "Pengolahan",
+    university: "Universitas Gadjah Mada",
+    major: "Sistem Informasi",
   },
   {
     name: "Sinta Maharani",
@@ -74,7 +77,8 @@ const sampleRows = [
     in: "-",
     out: "-",
     status: "Belum Absen",
-    dept: "Referensi",
+    university: "Institut Teknologi Bandung",
+    major: "Teknik Informatika",
   },
   {
     name: "Rizky Ramadhan",
@@ -82,7 +86,8 @@ const sampleRows = [
     in: "07:48",
     out: "16:08",
     status: "Hadir",
-    dept: "Layanan Digital",
+    university: "Universitas Indonesia",
+    major: "Manajemen Informatika",
   },
 ];
 const demoAccountsKey = "magang-accounts";
@@ -102,7 +107,8 @@ const getDemoRows = () => {
           .slice(0, 2)
           .join("")
           .toUpperCase(),
-        dept: x.department || "-",
+        university: x.university || "-",
+        major: x.major || "-",
         internship_start: x.internship_start || "",
         internship_end: x.internship_end || "",
         in: "-",
@@ -140,7 +146,9 @@ const getSignedPhotoUrl = async (value) => {
   const { data, error } = await supabase.storage
     .from("profile-photos")
     .createSignedUrl(path, 60 * 60);
-  return error ? "" : data.signedUrl;
+  // URL lama (public atau signed) tetap bisa dipakai. Untuk path private,
+  // selalu buat URL baru agar foto yang baru diunggah langsung tampil.
+  return error ? (path.startsWith("http") ? value : "") : data.signedUrl;
 };
 
 const showAppMessage = (message, type = "success") =>
@@ -559,11 +567,22 @@ function Login({ onLogin }) {
               <ChevronLeft className="rotate" size={18} />
             </button>
           </form>
-          <button className="switch" onClick={() => setAdmin(!admin)}>
-            {admin
-              ? "Masuk sebagai anak magang"
-              : "Masuk sebagai admin/pembimbing"}
-          </button>
+          <div className="role-switch" aria-label="Pilih portal login">
+            <button
+              type="button"
+              className={!admin ? "active" : ""}
+              onClick={() => setAdmin(false)}
+            >
+              <ChevronLeft size={16} /> Anak magang
+            </button>
+            <button
+              type="button"
+              className={admin ? "active" : ""}
+              onClick={() => setAdmin(true)}
+            >
+              Admin/pembimbing <ChevronRight size={16} />
+            </button>
+          </div>
           <small className="secure">
             <ShieldCheck size={14} /> Koneksi aman dan terlindungi
           </small>
@@ -1131,7 +1150,7 @@ function Profile({ user, updateUser }) {
           <div className="avatar xl">{profile.initials}</div>
         )}
         <h2>{profile.name}</h2>
-        <p>Anak Magang · {profile.department || "-"}</p>
+        <p>Anak Magang · {profile.university || "-"}</p>
         <span className="badge green">Aktif</span>
         <hr />
         <div>
@@ -1139,8 +1158,12 @@ function Profile({ user, updateUser }) {
           <b>{profile.email || "-"}</b>
         </div>
         <div>
-          <small>DIVISI</small>
-          <b>{profile.department || "-"}</b>
+          <small>UNIVERSITAS</small>
+          <b>{profile.university || "-"}</b>
+        </div>
+        <div>
+          <small>JURUSAN</small>
+          <b>{profile.major || "-"}</b>
         </div>
       </div>
       <div className="panel detail-panel">
@@ -1236,9 +1259,8 @@ function AdminPage({ page, nav, flash }) {
       supabase
         .from("profiles")
         .select(
-          "id,name,email,photo_url,department,internship_start,internship_end,is_active",
+          "id,name,email,role,photo_url,university,major,internship_start,internship_end,is_active",
         )
-        .eq("role", "intern")
         .order("name"),
       supabase
         .from("attendance")
@@ -1253,7 +1275,11 @@ function AdminPage({ page, nav, flash }) {
     const byUser = new Map((attendances || []).map((a) => [a.user_id, a]));
     setRows(
       await Promise.all(
-        (profiles || []).map(async (p) => {
+        // Jangan membatasi query dengan role di database. Data lama bisa saja
+        // belum memiliki role "intern", tetapi tetap perlu terlihat di admin.
+        (profiles || [])
+          .filter((p) => p.role !== "admin")
+          .map(async (p) => {
           const a = byUser.get(p.id);
           const signedPhotoUrl = await getSignedPhotoUrl(p.photo_url);
           const time = (v) =>
@@ -1278,12 +1304,13 @@ function AdminPage({ page, nav, flash }) {
               .slice(0, 2)
               .join("")
               .toUpperCase(),
-            dept: p.department || "",
+            university: p.university || "",
+            major: p.major || "",
             in: time(a?.check_in),
             out: time(a?.check_out),
             status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
           };
-        }),
+          }),
       ),
     );
     setLoading(false);
@@ -1365,7 +1392,8 @@ function AttendanceTable({ rows, onEdit, onDelete }) {
       <thead>
         <tr>
           <th>Nama</th>
-          <th>Divisi</th>
+          <th>Universitas</th>
+          <th>Jurusan</th>
           <th>Jam Masuk</th>
           <th>Jam Pulang</th>
           <th>Status</th>
@@ -1373,6 +1401,13 @@ function AttendanceTable({ rows, onEdit, onDelete }) {
         </tr>
       </thead>
       <tbody>
+        {!rows.length && (
+          <tr>
+            <td colSpan={manageable ? 7 : 6} className="empty-table">
+              Belum ada data anak magang di database.
+            </td>
+          </tr>
+        )}
         {rows.map((x, i) => (
           <tr key={x.id || i}>
             <td>
@@ -1389,7 +1424,8 @@ function AttendanceTable({ rows, onEdit, onDelete }) {
                 <b>{x.name}</b>
               </span>
             </td>
-            <td>{x.dept}</td>
+            <td>{x.university}</td>
+            <td>{x.major}</td>
             <td>{x.in}</td>
             <td>{x.out}</td>
             <td>
@@ -1616,7 +1652,8 @@ function Interns({ rows, loading, refresh, flash }) {
           accounts[i] = {
             ...accounts[i],
             name: form.name,
-            department: form.department,
+            university: form.university,
+            major: form.major,
             internship_start: form.internship_start,
             internship_end: form.internship_end,
           };
@@ -1649,7 +1686,8 @@ function Interns({ rows, loading, refresh, flash }) {
         .from("profiles")
         .update({
           name: form.name,
-          department: form.department || null,
+          university: form.university || null,
+          major: form.major || null,
           internship_start: form.internship_start || null,
           internship_end: form.internship_end || null,
         })
@@ -1761,11 +1799,19 @@ function Interns({ rows, loading, refresh, flash }) {
               </label>
             )}
             <label>
-              Divisi
+              Universitas
               <input
-                name="department"
-                defaultValue={editing?.dept}
-                placeholder="Contoh: Layanan Digital"
+                name="university"
+                defaultValue={editing?.university}
+                placeholder="Contoh: Universitas Indonesia"
+              />
+            </label>
+            <label>
+              Jurusan
+              <input
+                name="major"
+                defaultValue={editing?.major}
+                placeholder="Contoh: Ilmu Komputer"
               />
             </label>
             <div className="date-inputs">
@@ -1818,7 +1864,7 @@ function LeaveRequests({ user, flash }) {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("leave_requests")
-      .select("id,type,date_from,date_to,reason,status,created_at")
+      .select("id,type,date_from,date_to,reason,status,rejection_reason,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     if (error) flash(error.message, "error");
@@ -1901,6 +1947,9 @@ function LeaveRequests({ user, flash }) {
                   {formatDate(item.date_from)} – {formatDate(item.date_to)}
                 </p>
                 <small>{item.reason}</small>
+                {item.status === "Ditolak" && item.rejection_reason && (
+                  <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>
+                )}
               </div>
               <span
                 className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}
@@ -1919,33 +1968,27 @@ function LeaveRequests({ user, flash }) {
 
 function AdminWorkflows({ rows, refresh, flash }) {
   const [requests, setRequests] = useState([]);
-  const [audits, setAudits] = useState([]);
+  const [rejecting, setRejecting] = useState(null);
+  const [historyStatus, setHistoryStatus] = useState("Semua");
+  const [historyType, setHistoryType] = useState("Semua");
+  const [historyMonth, setHistoryMonth] = useState("");
   const load = async () => {
     if (!supabase) return;
-    const [{ data: leaveData, error }, { data: auditData }] = await Promise.all(
-      [
-        supabase
-          .from("leave_requests")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("audit_logs")
-          .select("id,action,details,created_at")
-          .order("created_at", { ascending: false })
-          .limit(12),
-      ],
-    );
+    const { data: leaveData, error } = await supabase
+      .from("leave_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
     if (error) flash(error.message, "error");
     setRequests(leaveData || []);
-    setAudits(auditData || []);
   };
   useEffect(() => {
     load();
   }, []);
-  const review = async (id, decision) => {
+  const review = async (id, decision, rejectionNote = null) => {
     const { error } = await supabase.rpc("review_leave_request", {
       request_id: id,
       decision,
+      rejection_note: rejectionNote,
     });
     if (error) return flash(error.message, "error");
     flash(`Pengajuan ${decision.toLowerCase()}.`);
@@ -1976,6 +2019,13 @@ function AdminWorkflows({ rows, refresh, flash }) {
   };
   const nameOf = (id) =>
     rows.find((row) => row.id === id)?.name || "Anak magang";
+  const historyRequests = requests.filter((item) => {
+    const matchesStatus =
+      historyStatus === "Semua" || item.status === historyStatus;
+    const matchesType = historyType === "Semua" || item.type === historyType;
+    const matchesMonth = !historyMonth || item.date_from.startsWith(historyMonth);
+    return matchesStatus && matchesType && matchesMonth;
+  });
   return (
     <div className="admin-workflows">
       <div className="panel">
@@ -2004,7 +2054,7 @@ function AdminWorkflows({ rows, refresh, flash }) {
                 <div className="workflow-actions">
                   <button
                     className="outline"
-                    onClick={() => review(item.id, "Ditolak")}
+                    onClick={() => setRejecting(item)}
                   >
                     Tolak
                   </button>
@@ -2072,32 +2122,111 @@ function AdminWorkflows({ rows, refresh, flash }) {
         <button className="primary">Simpan koreksi</button>
       </form>
       <div className="panel audit-panel">
-        <h2>Audit terbaru</h2>
-        {audits.length ? (
-          audits.map((item) => (
-            <div className="audit-item" key={item.id}>
-              <b>{item.action.replaceAll("_", " ")}</b>
-              <small>{new Date(item.created_at).toLocaleString("id-ID")}</small>
+        <div className="section-head">
+          <div>
+            <h2>Riwayat pengajuan</h2>
+            <p>Semua pengajuan izin dan sakit yang telah dikirim.</p>
+          </div>
+        </div>
+        <div className="history-filters">
+          <input
+            type="month"
+            value={historyMonth}
+            onChange={(event) => setHistoryMonth(event.target.value)}
+            aria-label="Filter bulan pengajuan"
+          />
+          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
+            <option>Semua</option><option>Izin</option><option>Sakit</option>
+          </select>
+          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
+            <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
+          </select>
+        </div>
+        {historyRequests.length ? (
+          historyRequests.map((item) => (
+            <div className="workflow-item" key={item.id}>
+              <div>
+                <b>{nameOf(item.user_id)} · {item.type}</b>
+                <p>{formatDate(item.date_from)} – {formatDate(item.date_to)}</p>
+                <small>{item.reason}</small>
+                {item.status === "Ditolak" && item.rejection_reason && <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>}
+              </div>
+              <span className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}>
+                {item.status}
+              </span>
             </div>
           ))
         ) : (
-          <p className="empty-state">Belum ada audit.</p>
+          <p className="empty-state">Tidak ada pengajuan sesuai filter.</p>
         )}
       </div>
+      {rejecting && (
+        <div className="modal-backdrop">
+          <form className="modal" onSubmit={async (event) => {
+            event.preventDefault();
+            const note = new FormData(event.currentTarget).get("rejection_reason");
+            await review(rejecting.id, "Ditolak", note);
+            setRejecting(null);
+          }}>
+            <button type="button" className="modal-close" onClick={() => setRejecting(null)}><X size={18} /></button>
+            <h2>Tolak pengajuan</h2>
+            <p>Tulis alasan penolakan agar dapat dilihat oleh {nameOf(rejecting.user_id)}.</p>
+            <label>Alasan penolakan<textarea name="rejection_reason" minLength="5" rows="4" required autoFocus /></label>
+            <button className="primary full">Kirim penolakan</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
 
 function Reports({ flash, rows }) {
-  const hadir = rows.filter((x) => x.in !== "-").length,
-    terlambat = rows.filter((x) => x.status === "Terlambat").length,
-    persen = rows.length ? Math.round((hadir / rows.length) * 100) : 0;
+  const [mode, setMode] = useState("month");
+  const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [attendance, setAttendance] = useState([]);
+  const [sickRequests, setSickRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const period = mode === "month" ? selectedMonth : selectedDate;
+  const range = useMemo(() => {
+    if (mode === "date") return { from: selectedDate, to: selectedDate };
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const last = new Date(year, month, 0).getDate();
+    return { from: `${selectedMonth}-01`, to: `${selectedMonth}-${String(last).padStart(2, "0")}` };
+  }, [mode, selectedMonth, selectedDate]);
+  const load = async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const [{ data: attendanceData, error }, { data: requestData, error: requestError }] = await Promise.all([
+      supabase.from("attendance").select("user_id,date,check_in,check_out,status").gte("date", range.from).lte("date", range.to).order("date"),
+      supabase.from("leave_requests").select("user_id,type,date_from,date_to,reason,status").eq("type", "Sakit").eq("status", "Disetujui").lte("date_from", range.to).gte("date_to", range.from),
+    ]);
+    if (error || requestError) flash((error || requestError).message, "error");
+    else { setAttendance(attendanceData || []); setSickRequests(requestData || []); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [range.from, range.to]);
+  const nameOf = (id) => rows.find((x) => x.id === id);
+  const reportRows = attendance.map((item) => {
+    const person = nameOf(item.user_id);
+    return { ...item, name: person?.name || "Anak magang", university: person?.university || "-", major: person?.major || "-", in: item.check_in ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(item.check_in)) : "-", out: item.check_out ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(item.check_out)) : "-" };
+  });
+  const summary = rows.map((person) => {
+    const own = attendance.filter((item) => item.user_id === person.id);
+    return { name: person.name, hadir: own.filter((x) => x.status === "Hadir").length, terlambat: own.filter((x) => x.status === "Terlambat").length, sakit: own.filter((x) => x.status === "Sakit").length, alpa: own.filter((x) => x.status === "Alpa").length };
+  });
+  const approvedSick = sickRequests.map((item) => ({ ...item, name: nameOf(item.user_id)?.name || "Anak magang" }));
+  const hadir = summary.reduce((total, item) => total + item.hadir, 0);
+  const terlambat = summary.reduce((total, item) => total + item.terlambat, 0);
+  const sakit = summary.reduce((total, item) => total + item.sakit, 0);
+  const alpa = summary.reduce((total, item) => total + item.alpa, 0);
+  const payload = { rows: reportRows, summary, requests: approvedSick, label: mode === "month" ? new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date(`${selectedMonth}-01T00:00:00`)) : formatDate(selectedDate), fileKey: period };
   const excel = async () => {
-    await exportAttendanceExcel(rows, today);
+    await exportAttendanceExcel(payload);
     flash("File Excel berhasil diunduh.");
   };
   const pdf = async () => {
-    await exportAttendancePdf(rows, formatDate(today), today);
+    await exportAttendancePdf(payload);
     flash("File PDF berhasil diunduh.");
   };
   return (
@@ -2105,24 +2234,21 @@ function Reports({ flash, rows }) {
       <div className="panel report-filter">
         <div>
           <h2>Rekap Laporan</h2>
-          <p>Ringkasan kehadiran hari ini dari Supabase.</p>
+          <p>Pilih tanggal atau bulan untuk melihat dan mengunduh rekap.</p>
         </div>
-        <select>
-          <option>{formatDate(today)}</option>
+        <select value={mode} onChange={(event) => setMode(event.target.value)}>
+          <option value="date">Tanggal</option>
+          <option value="month">Bulanan</option>
         </select>
-        <button
-          className="primary"
-          onClick={() => flash("Filter laporan diterapkan")}
-        >
-          Tampilkan
-        </button>
+        <input type={mode === "month" ? "month" : "date"} value={mode === "month" ? selectedMonth : selectedDate} onChange={(event) => mode === "month" ? setSelectedMonth(event.target.value) : setSelectedDate(event.target.value)} />
+        <button className="primary" onClick={load} disabled={loading}>{loading ? "Memuat..." : "Tampilkan"}</button>
       </div>
       <section className="stat-grid report-stats">
         {[
-          [String(rows.length), "Anak magang"],
-          [String(hadir), "Hadir hari ini"],
+          [String(hadir), "Hadir"],
           [String(terlambat), "Terlambat"],
-          [persen + "%", "Kehadiran"],
+          [String(sakit), "Sakit"],
+          [String(alpa), "Alpa"],
         ].map((x) => (
           <div className="stat-card simple" key={x[1]}>
             <b>{x[0]}</b>
@@ -2134,7 +2260,7 @@ function Reports({ flash, rows }) {
         <FileText size={28} />
         <div>
           <h3>Unduh laporan absensi</h3>
-          <p>File memuat data yang sedang tampil di dashboard.</p>
+          <p>Ekspor {payload.label}, termasuk rekap per peserta dan sakit yang disetujui.</p>
         </div>
         <button className="outline" onClick={excel}>
           <Download size={16} /> Export Excel

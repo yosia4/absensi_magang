@@ -29,11 +29,11 @@ Deno.serve(async (req) => {
     const { error: authError } = await service.auth.admin.updateUserById(body.id, userUpdate)
     if (authError) throw authError
     const { error: profileError } = await service.from('profiles').update({
-      name: body.name, email: body.email, department: body.department || null,
+      name: body.name, email: body.email, university: body.university || null, major: body.major || null,
       internship_start: body.internship_start || null, internship_end: body.internship_end || null,
     }).eq('id', body.id)
     if (profileError) throw profileError
-    await service.from('audit_logs').insert({ actor_id: user.id, action: 'update_intern', target_id: body.id, details: { email: body.email, department: body.department || null } })
+    await service.from('audit_logs').insert({ actor_id: user.id, action: 'update_intern', target_id: body.id, details: { email: body.email, university: body.university || null, major: body.major || null } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400, headers: corsHeaders })

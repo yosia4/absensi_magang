@@ -580,6 +580,11 @@ td {
   border-bottom: 1px solid #eef1f5;
   color: #5c6c81;
 }
+.empty-table {
+  padding: 28px 10px;
+  text-align: center;
+  color: #8a97a8;
+}
 .person {
   display: flex;
   align-items: center;
@@ -936,6 +941,27 @@ td {
   width: 100%;
   padding: 18px;
 }
+.role-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin: 18px 0 12px;
+  border-radius: 10px;
+  background: #edf3f0;
+}
+.role-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 7px;
+  background: transparent;
+  color: #5c6c81;
+  font-size: 12px;
+}
+.role-switch button.active { background: #fff; color: #188258; box-shadow: 0 1px 4px #1d51301c; }
 .secure {
   display: flex;
   gap: 5px;
@@ -1661,6 +1687,23 @@ td {
 .admin-workflows .audit-panel {
   grid-column: 1 / -1;
 }
+.history-filters,
+.report-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.history-filters { margin: 12px 0; }
+.history-filters input,
+.history-filters select,
+.report-filter input,
+.report-filter select {
+  border: 1px solid #dfe5ec;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  font: inherit;
+}
 .workflow-item {
   display: flex;
   align-items: center;
@@ -1676,6 +1719,12 @@ td {
 }
 .workflow-item small {
   color: #8591a3;
+}
+.workflow-item .rejection-reason {
+  display: block;
+  margin-top: 6px;
+  color: #b4473a;
+  line-height: 1.45;
 }
 .workflow-actions {
   display: flex;
@@ -1713,6 +1762,8 @@ td {
     align-items: flex-start;
     flex-direction: column;
   }
+  .history-filters,
+  .report-filter { align-items: stretch; flex-wrap: wrap; }
 }
 .confirm-card {
   width: min(390px, 100%);

@@ -48,7 +48,7 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 ### Admin/Pembimbing
 
 - Login sebagai admin.
-- Menambah akun anak magang dengan nama, email, kata sandi, divisi, serta periode magang.
+- Menambah akun anak magang dengan nama, email, kata sandi, universitas, jurusan, serta periode magang.
 - Melihat daftar anak magang dari database secara real-time.
 - Mengubah data anak magang.
 - Menghapus akun anak magang.
@@ -71,7 +71,7 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 
 ### `profiles`
 
-Menyimpan data pengguna seperti nama, email, peran (`admin` atau `intern`), divisi, periode magang, dan status aktif.
+Menyimpan data pengguna seperti nama, email, peran (`admin` atau `intern`), universitas, jurusan, periode magang, dan status aktif.
 
 ### `attendance`
 

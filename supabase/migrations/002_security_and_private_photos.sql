@@ -45,7 +45,7 @@ create policy "profile photo private view"
   on storage.objects for select to authenticated
   using (
     bucket_id = 'profile-photos'
-    and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin())
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin())  
   );
 create policy "profile photo own upload"
   on storage.objects for insert to authenticated

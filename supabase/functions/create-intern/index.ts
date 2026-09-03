@@ -23,7 +23,8 @@ Deno.serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         name: body.name,
-        department: body.department || '',
+        university: body.university || '',
+        major: body.major || '',
         internship_start: body.internship_start || '',
         internship_end: body.internship_end || '',
       },
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
     if (createError) throw createError
     // Trigger `on_auth_user_created` pada schema.sql membuat profil intern.
     // Metadata di atas memastikan nama dan data magang ikut tersimpan.
-    await service.from('audit_logs').insert({ actor_id: user.id, action: 'create_intern', target_id: created.user.id, details: { email: body.email, department: body.department || null } })
+    await service.from('audit_logs').insert({ actor_id: user.id, action: 'create_intern', target_id: created.user.id, details: { email: body.email, university: body.university || null, major: body.major || null } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) { return Response.json({ error: error.message }, { status: 400, headers: corsHeaders }) }
 })
