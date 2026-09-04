@@ -30,8 +30,26 @@ Deno.serve(async (req) => {
       },
     })
     if (createError) throw createError
-    // Trigger `on_auth_user_created` pada schema.sql membuat profil intern.
-    // Metadata di atas memastikan nama dan data magang ikut tersimpan.
+
+    // Trigger Auth membuat profile awal. Upsert ini tetap diperlukan agar data
+    // universitas dan jurusan tersimpan juga pada project yang trigger-nya
+    // masih versi lama.
+    const { error: profileError } = await service.from('profiles').upsert({
+      id: created.user.id,
+      name: body.name,
+      email: body.email,
+      role: 'intern',
+      university: body.university || null,
+      major: body.major || null,
+      internship_start: body.internship_start || null,
+      internship_end: body.internship_end || null,
+      is_active: true,
+    }, { onConflict: 'id' })
+    if (profileError) {
+      await service.auth.admin.deleteUser(created.user.id)
+      throw profileError
+    }
+
     await service.from('audit_logs').insert({ actor_id: user.id, action: 'create_intern', target_id: created.user.id, details: { email: body.email, university: body.university || null, major: body.major || null } })
     return Response.json({ ok: true }, { headers: corsHeaders })
   } catch (error) { return Response.json({ error: error.message }, { status: 400, headers: corsHeaders }) }

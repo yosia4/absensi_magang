@@ -15,7 +15,7 @@
   alter table public.qr_sessions add column if not exists is_static boolean not null default false;
   alter table public.qr_sessions add column if not exists label text;
   create table if not exists public.attendance (
-  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles(id),
+  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles(id) on delete cascade,
   date date not null default current_date, check_in timestamptz, check_out timestamptz,
   status text not null default 'Hadir', created_at timestamptz not null default now(), unique(user_id,date)
   );
@@ -86,7 +86,7 @@
   alter table public.system_settings add column if not exists late_tolerance_minutes integer not null default 0 check (late_tolerance_minutes between 0 and 120);
   alter table public.system_settings add column if not exists work_days smallint[] not null default array[1,2,3,4,5];
   alter table public.system_settings add column if not exists qr_enabled boolean not null default true;
-  create table if not exists public.audit_logs (id bigint generated always as identity primary key, actor_id uuid references public.profiles(id), action text not null, target_id uuid, details jsonb not null default '{}'::jsonb, created_at timestamptz not null default now());
+  create table if not exists public.audit_logs (id bigint generated always as identity primary key, actor_id uuid references public.profiles(id) on delete set null, action text not null, target_id uuid, details jsonb not null default '{}'::jsonb, created_at timestamptz not null default now());
   create table if not exists public.notifications (id bigint generated always as identity primary key, user_id uuid not null references public.profiles(id) on delete cascade, title text not null, message text not null, read_at timestamptz, created_at timestamptz not null default now());
   alter table public.audit_logs enable row level security; alter table public.notifications enable row level security;
   drop policy if exists "admin audit logs" on public.audit_logs;

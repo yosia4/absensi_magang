@@ -122,6 +122,7 @@ const getDemoRows = () => {
         major: x.major || "-",
         internship_start: x.internship_start || "",
         internship_end: x.internship_end || "",
+        is_active: x.is_active !== false,
         in: "-",
         out: "-",
         status: "Belum Absen",
@@ -1264,13 +1265,16 @@ function Profile({ user, updateUser }) {
 }
 function AdminPage({ page, nav, flash }) {
   const [rows, setRows] = useState(supabase ? [] : getDemoRows()),
-    [loading, setLoading] = useState(!!supabase);
-  const load = async () => {
+    [loading, setLoading] = useState(!!supabase),
+    [loadError, setLoadError] = useState(""),
+    [attendanceDate, setAttendanceDate] = useState(today);
+  const load = async (selectedDate = attendanceDate) => {
     if (!supabase) {
       setRows(getDemoRows());
       return;
     }
     setLoading(true);
+    setLoadError("");
     const [
       { data: profiles, error: profileError },
       { data: attendances, error: attendanceError },
@@ -1284,10 +1288,12 @@ function AdminPage({ page, nav, flash }) {
       supabase
         .from("attendance")
         .select("user_id,check_in,check_out,status")
-        .eq("date", today),
+        .eq("date", selectedDate),
     ]);
     if (profileError || attendanceError) {
-      flash((profileError || attendanceError).message, "error");
+      const message = (profileError || attendanceError).message;
+      setLoadError(message);
+      flash(message, "error");
       setLoading(false);
       return;
     }
@@ -1327,6 +1333,8 @@ function AdminPage({ page, nav, flash }) {
             major: p.major || "",
             in: time(a?.check_in),
             out: time(a?.check_out),
+            checkoutPending: Boolean(a?.check_in && !a?.check_out),
+            is_active: p.is_active,
             status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
           };
           }),
@@ -1335,28 +1343,50 @@ function AdminPage({ page, nav, flash }) {
     setLoading(false);
   };
   useEffect(() => {
-    load();
+    load(attendanceDate);
     if (!supabase) return;
     const channel = supabase
       .channel("admin-live-attendance")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "attendance" },
-        load,
+        () => load(attendanceDate),
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles" },
-        load,
+        () => load(attendanceDate),
       )
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, []);
+  }, [attendanceDate]);
+  useEffect(() => {
+    if (page !== "monitor" && attendanceDate !== today) {
+      setAttendanceDate(today);
+    }
+  }, [page, attendanceDate]);
   if (page === "qr") return <QrGenerator flash={flash} />;
-  if (page === "monitor") return <Monitoring rows={rows} loading={loading} />;
+  if (page === "monitor")
+    return (
+      <Monitoring
+        rows={rows}
+        loading={loading}
+        loadError={loadError}
+        onRetry={() => load(attendanceDate)}
+        attendanceDate={attendanceDate}
+        onAttendanceDateChange={setAttendanceDate}
+      />
+    );
   if (page === "interns")
     return (
-      <Interns rows={rows} loading={loading} refresh={load} flash={flash} />
+      <Interns
+        rows={rows}
+        loading={loading}
+        loadError={loadError}
+        onRetry={() => load(today)}
+        refresh={load}
+        flash={flash}
+      />
     );
   if (page === "requests")
     return <AdminWorkflows rows={rows} refresh={load} flash={flash} />;
@@ -1404,7 +1434,7 @@ function AdminDashboard({ rows, nav, loading }) {
     </>
   );
 }
-function AttendanceTable({ rows, onEdit, onDelete }) {
+function AttendanceTable({ rows, onEdit, onDelete, showAttendance = true }) {
   const manageable = !!(onEdit || onDelete);
   return (
     <table>
@@ -1413,16 +1443,19 @@ function AttendanceTable({ rows, onEdit, onDelete }) {
           <th>Nama</th>
           <th>Universitas</th>
           <th>Jurusan</th>
-          <th>Jam Masuk</th>
-          <th>Jam Pulang</th>
-          <th>Status</th>
+          {showAttendance && <th>Jam Masuk</th>}
+          {showAttendance && <th>Jam Pulang</th>}
+          {showAttendance && <th>Status</th>}
           {manageable && <th>Aksi</th>}
         </tr>
       </thead>
       <tbody>
         {!rows.length && (
           <tr>
-            <td colSpan={manageable ? 7 : 6} className="empty-table">
+            <td
+              colSpan={(showAttendance ? 6 : 3) + (manageable ? 1 : 0)}
+              className="empty-table"
+            >
               Belum ada data anak magang di database.
             </td>
           </tr>
@@ -1445,39 +1478,90 @@ function AttendanceTable({ rows, onEdit, onDelete }) {
             </td>
             <td>{x.university}</td>
             <td>{x.major}</td>
-            <td>{x.in}</td>
-            <td>{x.out}</td>
-            <td>
-              <span
-                className={
-                  "badge " +
-                  (x.status === "Terlambat"
-                    ? "orange"
-                    : x.status === "Hadir"
-                      ? "green"
-                      : "gray")
-                }
-              >
-                {x.status}
-              </span>
-            </td>
+            {showAttendance && <td>{x.in}</td>}
+            {showAttendance && <td>{x.out}</td>}
+            {showAttendance && (
+              <td>
+                <span
+                  className={
+                    "badge " +
+                    ({
+                      Hadir: "green",
+                      Terlambat: "orange",
+                      Izin: "blue",
+                      Sakit: "purple",
+                      Alpa: "red",
+                      Nonaktif: "red",
+                      "Belum Absen": "gray",
+                    }[x.status] || "gray")
+                  }
+                >
+                  {x.status}
+                </span>
+                {x.checkoutPending && (
+                  <small className="checkout-pending">Belum check-out</small>
+                )}
+              </td>
+            )}
             {manageable && (
               <td className="table-actions">
-                <button className="text-btn" onClick={() => onEdit?.(x)}>
-                  Edit
-                </button>
-                <button
-                  className="text-btn danger-btn"
-                  onClick={() => onDelete?.(x)}
-                >
-                  Hapus
-                </button>
+                {onEdit && (
+                  <button className="text-btn" onClick={() => onEdit(x)}>
+                    Edit
+                  </button>
+                )}
+                {onDelete && (
+                  <button className="text-btn danger-btn" onClick={() => onDelete(x)}>
+                    Hapus
+                  </button>
+                )}
               </td>
             )}
           </tr>
         ))}
       </tbody>
     </table>
+  );
+}
+function TablePagination({ page, totalItems, pageSize = 10, onChange }) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (totalItems <= pageSize) return null;
+  const activePage = Math.min(page, totalPages);
+  return (
+    <div className="table-pagination" aria-label="Navigasi halaman tabel">
+      <small>
+        Menampilkan {(activePage - 1) * pageSize + 1}–
+        {Math.min(activePage * pageSize, totalItems)} dari {totalItems} data
+      </small>
+      <div>
+        <button
+          className="outline"
+          disabled={activePage === 1}
+          onClick={() => onChange(activePage - 1)}
+        >
+          Sebelumnya
+        </button>
+        <span>Halaman {activePage} / {totalPages}</span>
+        <button
+          className="outline"
+          disabled={activePage === totalPages}
+          onClick={() => onChange(activePage + 1)}
+        >
+          Berikutnya
+        </button>
+      </div>
+    </div>
+  );
+}
+function DataLoadError({ message, loading, onRetry }) {
+  if (!message) return null;
+  return (
+    <div className="data-load-error" role="alert">
+      <span>Data tidak dapat dimuat: {message}</span>
+      <button className="outline" disabled={loading} onClick={onRetry}>
+        {loading ? "Memuat..." : "Coba lagi"}
+      </button>
+    </div>
   );
 }
 function QrGenerator({ flash }) {
@@ -1619,11 +1703,31 @@ function QrGenerator({ flash }) {
     </div>
   );
 }
-function Monitoring({ rows, loading }) {
-  const [q, setQ] = useState("");
-  const filtered = rows.filter((x) =>
-    x.name.toLowerCase().includes(q.toLowerCase()),
-  );
+function Monitoring({
+  rows,
+  loading,
+  loadError,
+  onRetry,
+  attendanceDate,
+  onAttendanceDateChange,
+}) {
+  const [q, setQ] = useState(""),
+    [statusFilter, setStatusFilter] = useState("all"),
+    [currentPage, setCurrentPage] = useState(1);
+  const filtered = rows.filter((x) => {
+    const matchesQuery = x.name.toLowerCase().includes(q.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "absent" && x.status === "Belum Absen") ||
+      (statusFilter === "late" && x.status === "Terlambat") ||
+      (statusFilter === "attended" && x.in !== "-");
+    return matchesQuery && matchesStatus;
+  });
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const visibleRows = filtered.slice((activePage - 1) * pageSize, activePage * pageSize);
+  useEffect(() => setCurrentPage(1), [q, statusFilter, attendanceDate]);
   return (
     <div className="panel table-panel">
       <div className="panel-heading">
@@ -1635,27 +1739,70 @@ function Monitoring({ rows, loading }) {
               : "Pembaruan otomatis saat absensi masuk."}
           </p>
         </div>
-        <button className="filter">
-          <CalendarDays size={16} /> Hari ini
-        </button>
+        <label className="filter">
+          <CalendarDays size={16} />
+          <span className="sr-only">Pilih tanggal absensi</span>
+          <input
+            type="date"
+            value={attendanceDate}
+            max={today}
+            onChange={(event) => onAttendanceDateChange(event.target.value)}
+            aria-label="Pilih tanggal absensi"
+          />
+        </label>
       </div>
-      <div className="search">
-        <Search size={18} />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Cari nama anak magang..."
-        />
+      <DataLoadError message={loadError} loading={loading} onRetry={onRetry} />
+      <div className="history-filters" aria-label="Filter monitoring absensi">
+        <div className="search">
+          <Search size={18} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Cari nama anak magang..."
+            aria-label="Cari anak magang"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          aria-label="Filter status absensi"
+        >
+          <option value="all">Semua status</option>
+          <option value="absent">Belum Absen</option>
+          <option value="late">Terlambat</option>
+          <option value="attended">Sudah Absen</option>
+        </select>
       </div>
-      <AttendanceTable rows={filtered} />
+      <AttendanceTable rows={visibleRows} />
+      <TablePagination
+        page={activePage}
+        totalItems={filtered.length}
+        pageSize={pageSize}
+        onChange={setCurrentPage}
+      />
     </div>
   );
 }
-function Interns({ rows, loading, refresh, flash }) {
+function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
   const [open, setOpen] = useState(false),
     [saving, setSaving] = useState(false),
+    [deletingInProgress, setDeletingInProgress] = useState(false),
     [editing, setEditing] = useState(null),
-    [deleting, setDeleting] = useState(null);
+    [deleting, setDeleting] = useState(null),
+    [query, setQuery] = useState(""),
+    [currentPage, setCurrentPage] = useState(1);
+  const filteredRows = rows.filter((row) => {
+    const searchable = [row.name, row.email, row.university, row.major]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("id-ID");
+    return searchable.includes(query.toLocaleLowerCase("id-ID"));
+  });
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const visibleRows = filteredRows.slice((activePage - 1) * pageSize, activePage * pageSize);
+  useEffect(() => setCurrentPage(1), [query]);
   const close = () => {
     setOpen(false);
     setEditing(null);
@@ -1741,6 +1888,8 @@ function Interns({ rows, loading, refresh, flash }) {
     refresh();
   };
   const remove = async (intern) => {
+    if (deletingInProgress) return;
+    setDeletingInProgress(true);
     if (!supabase) {
       localStorage.setItem(
         demoAccountsKey,
@@ -1750,17 +1899,25 @@ function Interns({ rows, loading, refresh, flash }) {
       );
       flash("Akun anak magang dihapus.");
       setDeleting(null);
+      setDeletingInProgress(false);
       return;
     }
     const { error } = await supabase.functions.invoke("delete-intern", {
       body: { id: intern.id },
     });
     if (error) {
-      flash(error.message || "Akun tidak dapat dihapus", "error");
+      let message = error.message || "Akun tidak dapat dihapus";
+      try {
+        const body = await error.context?.json();
+        message = body.error || message;
+      } catch {}
+      flash(message, "error");
+      setDeletingInProgress(false);
       return;
     }
     flash("Akun anak magang dihapus.");
     setDeleting(null);
+    setDeletingInProgress(false);
     refresh();
   };
   const edit = (intern) => {
@@ -1772,7 +1929,11 @@ function Interns({ rows, loading, refresh, flash }) {
       <div className="panel-heading">
         <div>
           <h2>Data Anak Magang</h2>
-          <p>{loading ? "Memuat data..." : "Kelola data anak magang."}</p>
+          <p>
+            {loading
+              ? "Memuat data..."
+              : `Menampilkan ${filteredRows.length} dari ${rows.length} anak magang.`}
+          </p>
         </div>
         <button
           className="primary"
@@ -1784,7 +1945,28 @@ function Interns({ rows, loading, refresh, flash }) {
           + Tambah Anak Magang
         </button>
       </div>
-      <AttendanceTable rows={rows} onEdit={edit} onDelete={setDeleting} />
+      <DataLoadError message={loadError} loading={loading} onRetry={onRetry} />
+      <div className="search" aria-label="Cari anak magang">
+        <Search size={18} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Cari nama, universitas, atau jurusan..."
+          aria-label="Cari nama, universitas, atau jurusan"
+        />
+      </div>
+      <AttendanceTable
+        rows={visibleRows}
+        onEdit={edit}
+        onDelete={setDeleting}
+        showAttendance={false}
+      />
+      <TablePagination
+        page={activePage}
+        totalItems={filteredRows.length}
+        pageSize={pageSize}
+        onChange={setCurrentPage}
+      />
       {open && (
         <div className="modal-backdrop">
           <form className="modal" key={editing?.id || "new"} onSubmit={submit}>
@@ -1866,10 +2048,11 @@ function Interns({ rows, loading, refresh, flash }) {
           icon={<Users size={23} />}
           title="Hapus anak magang?"
           message={`Akun ${deleting.name} dan data terkait akan dihapus permanen.`}
-          confirmLabel="Ya, hapus"
           danger
           onCancel={() => setDeleting(null)}
           onConfirm={() => remove(deleting)}
+          confirmLabel={deletingInProgress ? "Menghapus..." : "Ya, hapus"}
+          confirmDisabled={deletingInProgress}
         />
       )}
     </div>

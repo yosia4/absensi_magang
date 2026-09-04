@@ -6,6 +6,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel,
   danger,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }) {
@@ -28,6 +29,7 @@ export default function ConfirmDialog({
           <button
             className={`primary${danger ? " danger-confirm" : ""}`}
             onClick={onConfirm}
+            disabled={confirmDisabled}
           >
             {confirmLabel}
           </button>

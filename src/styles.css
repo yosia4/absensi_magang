@@ -441,6 +441,14 @@ h3 {
   background: #fff1df;
   color: #c47413;
 }
+.red {
+  background: #fde9e7;
+  color: #bd4337;
+}
+.purple {
+  background: #f2eafd;
+  color: #7546a5;
+}
 .gray {
   background: #f0f2f5;
   color: #778499;
@@ -561,6 +569,36 @@ h3 {
 }
 .table-panel {
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  color: #6f7f90;
+}
+.table-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.table-pagination .outline {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.data-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #f3c5c0;
+  border-radius: 9px;
+  background: #fff3f1;
+  color: #a9443a;
 }
 table {
   width: 100%;
@@ -706,6 +744,24 @@ td {
   align-items: center;
   gap: 7px;
   font-weight: 600;
+}
+.filter input {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .primary {
   background: #17895c;
@@ -1230,6 +1286,29 @@ td {
   }
   .table-panel {
     margin: 0 -2px;
+    overflow-x: auto;
+  }
+  .history-filters {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .history-filters .search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .history-filters select {
+    min-height: 42px;
+  }
+  .table-actions {
+    white-space: nowrap;
+  }
+  .table-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .data-load-error {
+    align-items: flex-start;
+    flex-direction: column;
   }
   .modal-backdrop {
     align-items: end;
@@ -1700,6 +1779,14 @@ td {
   gap: 10px;
 }
 .history-filters { margin: 12px 0; }
+.history-filters .search { margin: 0; }
+.checkout-pending {
+  display: block;
+  margin-top: 5px;
+  color: #3b6ea4;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .history-filters input,
 .history-filters select,
 .report-filter input,
