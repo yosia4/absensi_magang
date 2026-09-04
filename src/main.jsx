@@ -41,7 +41,18 @@ const hasSupabase =
   cfg.key &&
   !cfg.url.includes("your-project.supabase.co") &&
   cfg.key !== "your-anon-key";
-const supabase = hasSupabase ? createClient(cfg.url, cfg.key) : null;
+const supabase = hasSupabase
+  ? createClient(cfg.url, cfg.key, {
+      auth: {
+        // Sesi hanya berlaku pada tab ini: refresh tetap login, sedangkan
+        // membuka aplikasi dari link/QR pada tab baru meminta login kembali.
+        storage: window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
 const today = (() => {
   const p = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jakarta",
@@ -375,6 +386,14 @@ function App() {
             </h1>
           </div>
           <div className="header-actions">
+            <button
+              className="icon-btn mobile-logout"
+              onClick={() => setLogoutOpen(true)}
+              aria-label="Keluar dari akun"
+              title="Keluar"
+            >
+              <LogOut size={19} />
+            </button>
             <button
               className="icon-btn"
               onClick={openNotifications}

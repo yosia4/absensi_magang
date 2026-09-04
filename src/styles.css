@@ -969,7 +969,8 @@ td {
   color: #8c98a8;
 }
 .mobile-brand,
-.bottom-nav {
+.bottom-nav,
+.mobile-logout {
   display: none;
 }
 @media (max-width: 800px) {
@@ -999,6 +1000,11 @@ td {
   .header-actions .avatar {
     width: 34px;
     height: 34px;
+  }
+  .mobile-logout {
+    display: grid;
+    place-items: center;
+    color: #c34747;
   }
   .bottom-nav {
     display: flex;
