@@ -7,6 +7,7 @@ import { exportAttendanceExcel, exportAttendancePdf } from "./reportExport";
 import ConfirmDialog from "./components/ConfirmDialog";
 import NotificationPanel from "./components/NotificationPanel";
 import {
+  AlertCircle,
   BadgeCheck,
   Bell,
   CalendarDays,
@@ -14,23 +15,21 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ClipboardEdit,
   Clock3,
   Download,
-  FileClock,
   FileSpreadsheet,
   FileText,
   Home,
   LayoutDashboard,
   LogOut,
   MapPin,
+  Menu,
   MoreHorizontal,
   QrCode,
   Search,
   Settings,
   ShieldCheck,
   User,
-  UserCog,
   Users,
   X,
 } from "lucide-react";
@@ -210,6 +209,7 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [attendance, setAttendance] = useState(() =>
     JSON.parse(localStorage.getItem("magang-attendance") || "[]"),
@@ -340,11 +340,8 @@ function App() {
           ["monitor", "Monitoring", CalendarDays],
           ["interns", "Anak Magang", Users],
           ["requests", "Kelola Pengajuan", FileText],
-          ["attendance-edit", "Edit Absensi", ClipboardEdit],
           ["reports", "Laporan", FileText],
-          ["audit-log", "Log Aktivitas", FileClock],
           ["settings", "Pengaturan", Settings],
-          ["profile", "Profil", UserCog],
         ]
       : [
           ["dashboard", "Beranda", Home],
@@ -371,7 +368,13 @@ function App() {
     );
   return (
     <div className="app-shell">
-      <aside>
+      {mobileNavOpen && (
+        <div
+          className="mobile-nav-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside className={mobileNavOpen ? "mobile-nav-open" : ""}>
         <div className="brand">
           <span className="brand-mark">
             <BadgeCheck />
@@ -384,7 +387,10 @@ function App() {
         {nav.map(([id, label, Icon]) => (
           <button
             className={"nav-item " + (page === id ? "active" : "")}
-            onClick={() => setPage(id)}
+            onClick={() => {
+              setPage(id);
+              setMobileNavOpen(false);
+            }}
             key={id}
           >
             <Icon size={19} />
@@ -401,6 +407,14 @@ function App() {
       </aside>
       <main>
         <header>
+          <button
+            type="button"
+            className="icon-btn hamburger-btn"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Buka menu"
+          >
+            <Menu size={20} />
+          </button>
           <div className="mobile-brand">
             Hadir<span>in</span>
           </div>
@@ -442,7 +456,9 @@ function App() {
             <button
               type="button"
               className="avatar header-avatar-btn"
-              onClick={() => setPage("profile")}
+              onClick={() =>
+                setPage(user.role === "admin" ? "settings" : "profile")
+              }
               aria-label="Lihat profil"
               title="Profil"
             >
@@ -468,7 +484,11 @@ function App() {
       </nav>
       {toast && (
         <div className={"toast " + toast.type}>
-          <Check size={18} />
+          {toast.type === "error" ? (
+            <AlertCircle size={18} />
+          ) : (
+            <Check size={18} />
+          )}
           {toast.message}
         </div>
       )}
@@ -609,7 +629,6 @@ function Login({ onLogin }) {
               <input
                 name="email"
                 type="email"
-                placeholder="nama@instansi.go.id"
                 autoComplete="off"
                 required
               />
@@ -619,7 +638,6 @@ function Login({ onLogin }) {
               <input
                 name="password"
                 type="password"
-                placeholder="••••••••"
                 autoComplete="new-password"
                 required
               />
@@ -1486,13 +1504,9 @@ function AdminPage({ page, nav, flash }) {
       />
     );
   if (page === "requests")
-    return <AdminLeaveRequests rows={rows} flash={flash} />;
-  if (page === "attendance-edit")
-    return <AdminAttendanceEdit rows={rows} refresh={load} flash={flash} />;
+    return <AdminWorkflows rows={rows} refresh={load} flash={flash} />;
   if (page === "reports") return <Reports flash={flash} rows={rows} />;
-  if (page === "audit-log") return <AdminAuditLog rows={rows} flash={flash} />;
   if (page === "settings") return <SettingsPage />;
-  if (page === "profile") return <AccountSettings />;
   return <AdminDashboard rows={rows} nav={nav} loading={loading} />;
 }
 function AdminDashboard({ rows, nav, loading }) {
@@ -2683,7 +2697,7 @@ function LeaveRequests({ user, flash }) {
   );
 }
 
-function AdminLeaveRequests({ rows, flash }) {
+function AdminWorkflows({ rows, refresh, flash }) {
   const [requests, setRequests] = useState([]);
   const [rejecting, setRejecting] = useState(null);
   const [historyStatus, setHistoryStatus] = useState("Semua");
@@ -2717,6 +2731,22 @@ function AdminLeaveRequests({ rows, flash }) {
     if (error) return flash(error.message, "error");
     flash(`${data} pengingat belum absen dikirim.`);
     load();
+  };
+  const correct = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const { error } = await supabase.rpc("correct_attendance", {
+      target_user_id: form.get("user_id"),
+      target_date: form.get("date"),
+      new_check_in: form.get("check_in") || null,
+      new_check_out: form.get("check_out") || null,
+      new_status: form.get("status"),
+      correction_reason: form.get("reason"),
+    });
+    if (error) return flash(error.message, "error");
+    flash("Koreksi absensi berhasil disimpan.");
+    event.currentTarget.reset();
+    refresh();
   };
   const nameOf = (id) =>
     rows.find((row) => row.id === id)?.name || "Anak magang";
@@ -2783,6 +2813,50 @@ function AdminLeaveRequests({ rows, flash }) {
           <p className="empty-state">Belum ada pengajuan.</p>
         )}
       </div>
+      <form className="panel settings" onSubmit={correct}>
+        <h2>Koreksi absensi</h2>
+        <p>Perbaiki jam masuk, jam pulang, atau status absensi anak magang.</p>
+        <label>
+          Anak magang
+          <select name="user_id" required>
+            <option value="">Pilih akun</option>
+            {rows.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Tanggal
+          <input type="date" name="date" required />
+        </label>
+        <div className="form-grid">
+          <label>
+            Jam masuk
+            <input type="time" name="check_in" />
+          </label>
+          <label>
+            Jam pulang
+            <input type="time" name="check_out" />
+          </label>
+        </div>
+        <label>
+          Status
+          <select name="status">
+            <option>Hadir</option>
+            <option>Terlambat</option>
+            <option>Izin</option>
+            <option>Sakit</option>
+            <option>Alpa</option>
+          </select>
+        </label>
+        <label>
+          Alasan koreksi
+          <textarea name="reason" minLength="5" required />
+        </label>
+        <button className="primary">Simpan koreksi</button>
+      </form>
       <div className="panel audit-panel">
         <div className="section-head">
           <div>
@@ -2857,265 +2931,6 @@ function AdminLeaveRequests({ rows, flash }) {
     </div>
   );
 }
-function AdminAttendanceEdit({ rows, refresh, flash }) {
-  const correct = async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const { error } = await supabase.rpc("correct_attendance", {
-      target_user_id: form.get("user_id"),
-      target_date: form.get("date"),
-      new_check_in: form.get("check_in") || null,
-      new_check_out: form.get("check_out") || null,
-      new_status: form.get("status"),
-      correction_reason: form.get("reason"),
-    });
-    if (error) return flash(error.message, "error");
-    flash("Koreksi absensi berhasil disimpan.");
-    event.currentTarget.reset();
-    refresh();
-  };
-  return (
-    <div className="admin-workflows">
-      <form className="panel settings" onSubmit={correct}>
-        <h2>Koreksi absensi</h2>
-        <p>Perbaiki jam masuk, jam pulang, atau status absensi anak magang.</p>
-        <label>
-          Anak magang
-          <select name="user_id" required>
-            <option value="">Pilih akun</option>
-            {rows.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Tanggal
-          <input type="date" name="date" required />
-        </label>
-        <div className="form-grid">
-          <label>
-            Jam masuk
-            <input type="time" name="check_in" />
-          </label>
-          <label>
-            Jam pulang
-            <input type="time" name="check_out" />
-          </label>
-        </div>
-        <label>
-          Status
-          <select name="status">
-            <option>Hadir</option>
-            <option>Terlambat</option>
-            <option>Izin</option>
-            <option>Sakit</option>
-            <option>Alpa</option>
-          </select>
-        </label>
-        <label>
-          Alasan koreksi
-          <textarea name="reason" minLength="5" required />
-        </label>
-        <button className="primary">Simpan koreksi</button>
-      </form>
-    </div>
-  );
-}
-
-const AUDIT_ACTION_LABELS = {
-  review_leave: "Persetujuan pengajuan",
-  correct_attendance: "Koreksi absensi",
-  generate_absence_reminders: "Pengingat absensi",
-  create_intern: "Tambah anak magang",
-  update_intern: "Ubah data anak magang",
-  delete_intern: "Hapus anak magang",
-  update_settings: "Ubah pengaturan",
-  logout: "Keluar akun",
-  profiles_update: "Ubah profil",
-  qr_sessions_insert: "Buat sesi QR",
-  qr_sessions_update: "Ubah sesi QR",
-  qr_sessions_delete: "Hapus sesi QR",
-};
-const describeAuditLog = (item, nameOf) => {
-  const d = item.details || {};
-  switch (item.action) {
-    case "review_leave":
-      return {
-        title: `Pengajuan ${nameOf(d.user_id)} ${d.decision || ""}`.trim(),
-        description: d.rejection_reason
-          ? `Alasan penolakan: ${d.rejection_reason}`
-          : "—",
-      };
-    case "correct_attendance":
-      return {
-        title: `Koreksi absensi ${nameOf(d.user_id)}${d.date ? " · " + formatDate(d.date) : ""}`,
-        description: `Status diubah ke ${d.status || "-"}. Alasan: ${d.reason || "-"}`,
-      };
-    case "generate_absence_reminders":
-      return {
-        title: "Kirim pengingat absensi",
-        description: `${d.count ?? 0} pengingat terkirim.`,
-      };
-    case "create_intern":
-      return {
-        title: "Tambah anak magang",
-        description: [d.email, d.university, d.major].filter(Boolean).join(" · ") || "—",
-      };
-    case "update_intern":
-      return {
-        title: `Ubah data anak magang ${nameOf(item.target_id)}`,
-        description: [d.email, d.university, d.major].filter(Boolean).join(" · ") || "—",
-      };
-    case "delete_intern":
-      return {
-        title: "Hapus anak magang",
-        description: [d.name, d.email].filter(Boolean).join(" · ") || "—",
-      };
-    case "update_settings":
-      return { title: "Ubah pengaturan absensi", description: "—" };
-    case "logout":
-      return { title: `${d.name || "Pengguna"} keluar akun`, description: "—" };
-    case "profiles_update":
-      return { title: "Ubah profil", description: "—" };
-    default:
-      if (item.action?.startsWith("qr_sessions_")) {
-        return { title: AUDIT_ACTION_LABELS[item.action] || item.action, description: "—" };
-      }
-      return { title: item.action, description: "—" };
-  }
-};
-function AdminAuditLog({ rows, flash }) {
-  const [logs, setLogs] = useState([]),
-    [loading, setLoading] = useState(true),
-    [loadError, setLoadError] = useState(""),
-    [actionFilter, setActionFilter] = useState("Semua"),
-    [historyDate, setHistoryDate] = useState(""),
-    [historyMonth, setHistoryMonth] = useState(""),
-    [expanded, setExpanded] = useState(null),
-    [currentPage, setCurrentPage] = useState(1);
-  const load = async () => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError("");
-    const { data, error } = await supabase
-      .from("audit_logs")
-      .select("id,actor_id,action,target_id,details,created_at,actor:profiles(name)")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (error) {
-      setLoadError(error.message);
-      flash(error.message, "error");
-      setLoading(false);
-      return;
-    }
-    setLogs(data || []);
-    setLoading(false);
-  };
-  useEffect(() => {
-    load();
-  }, []);
-  const nameOf = (id) => rows.find((row) => row.id === id)?.name || "anak magang";
-  const actionsPresent = [...new Set(logs.map((item) => item.action))];
-  const filtered = logs
-    .filter((item) => actionFilter === "Semua" || item.action === actionFilter)
-    .filter((item) =>
-      historyDate
-        ? item.created_at.slice(0, 10) === historyDate
-        : !historyMonth || item.created_at.startsWith(historyMonth),
-    );
-  const pageSize = 20;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const activePage = Math.min(currentPage, totalPages);
-  const visible = filtered.slice((activePage - 1) * pageSize, activePage * pageSize);
-  useEffect(() => setCurrentPage(1), [actionFilter, historyDate, historyMonth]);
-  return (
-    <div className="panel table-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Log Aktivitas</h2>
-          <p>Riwayat aksi admin dan sistem untuk keperluan audit.</p>
-        </div>
-      </div>
-      <DataLoadError message={loadError} loading={loading} onRetry={load} />
-      <div className="history-filters">
-        <input
-          type="date"
-          value={historyDate}
-          onChange={(event) => {
-            setHistoryDate(event.target.value);
-            if (event.target.value) setHistoryMonth("");
-          }}
-          aria-label="Filter tanggal log"
-        />
-        <input
-          type="month"
-          value={historyMonth}
-          onChange={(event) => {
-            setHistoryMonth(event.target.value);
-            if (event.target.value) setHistoryDate("");
-          }}
-          aria-label="Filter bulan log"
-        />
-        <select
-          value={actionFilter}
-          onChange={(event) => setActionFilter(event.target.value)}
-          aria-label="Filter jenis aktivitas"
-        >
-          <option>Semua</option>
-          {actionsPresent.map((action) => (
-            <option key={action} value={action}>
-              {AUDIT_ACTION_LABELS[action] || action}
-            </option>
-          ))}
-        </select>
-      </div>
-      {visible.length ? (
-        visible.map((item) => {
-          const { title, description } = describeAuditLog(item, nameOf);
-          return (
-            <div className="workflow-item" key={item.id}>
-              <div>
-                <b>{title}</b>
-                <p>{description}</p>
-                <small>
-                  {item.actor?.name || "Sistem"} · {formatDate(item.created_at)}{" "}
-                  {formatTime(item.created_at)}
-                </small>
-                {expanded === item.id && (
-                  <pre className="audit-detail-json">
-                    {JSON.stringify(item.details, null, 2)}
-                  </pre>
-                )}
-              </div>
-              <button
-                className="text-btn"
-                onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-              >
-                {expanded === item.id ? "Sembunyikan" : "Detail"}
-              </button>
-            </div>
-          );
-        })
-      ) : (
-        <p className="empty-state">
-          {logs.length ? "Tidak ada log sesuai filter." : "Belum ada log aktivitas."}
-        </p>
-      )}
-      <TablePagination
-        page={activePage}
-        totalItems={filtered.length}
-        pageSize={pageSize}
-        onChange={setCurrentPage}
-      />
-    </div>
-  );
-}
-
 function Reports({ flash, rows }) {
   const [mode, setMode] = useState("month");
   const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7));
@@ -3325,6 +3140,7 @@ function SettingsPage() {
           {saving ? "Menyimpan..." : "Simpan pengaturan"}
         </button>
       </form>
+      <AccountSettings />
     </>
   );
 }

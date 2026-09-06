@@ -925,6 +925,9 @@ td {
   box-shadow: 0 8px 20px #12274b35;
   font-weight: 600;
 }
+.toast.error {
+  background: #c53a3a;
+}
 .login {
   min-height: 100vh;
   display: grid;
@@ -1036,12 +1039,36 @@ td {
 }
 .mobile-brand,
 .bottom-nav,
-.mobile-logout {
+.mobile-logout,
+.hamburger-btn,
+.mobile-nav-backdrop {
   display: none;
 }
 @media (max-width: 800px) {
   aside {
-    display: none;
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(270px, 82vw);
+    z-index: 9;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 12px 0 30px #081a3340;
+    overflow-y: auto;
+  }
+  aside.mobile-nav-open {
+    transform: translateX(0);
+  }
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: #10213c80;
+    z-index: 8;
+  }
+  .hamburger-btn {
+    display: grid;
+    place-items: center;
   }
   main {
     margin: 0;
