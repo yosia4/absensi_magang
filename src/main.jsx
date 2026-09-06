@@ -1,20 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
-import { Html5QrcodeScanner, Html5QrcodeScanType } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeSVG } from "qrcode.react";
 import { exportAttendanceExcel, exportAttendancePdf } from "./reportExport";
 import ConfirmDialog from "./components/ConfirmDialog";
 import NotificationPanel from "./components/NotificationPanel";
 import {
+  BadgeCheck,
   Bell,
   CalendarDays,
   Camera,
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardEdit,
   Clock3,
   Download,
+  FileClock,
+  FileSpreadsheet,
   FileText,
   Home,
   LayoutDashboard,
@@ -26,6 +30,7 @@ import {
   Settings,
   ShieldCheck,
   User,
+  UserCog,
   Users,
   X,
 } from "lucide-react";
@@ -145,22 +150,44 @@ const formatDate = (d) =>
     year: "numeric",
   }).format(new Date(d));
 
+const formatTime = (v) =>
+  v
+    ? new Intl.DateTimeFormat("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(v))
+    : "-";
+
 const getPhotoPath = (value = "") => {
   const marker = "/profile-photos/";
   if (!value.startsWith("http") || !value.includes(marker)) return value;
   return decodeURIComponent(value.split(marker)[1].split("?")[0]);
 };
 
+// Cache per path (bukan per URL) selama ~50 menit (token berlaku 60 menit) agar
+// realtime refresh yang sering (mis. setiap ada yang absen) tidak membuat ulang
+// signed URL untuk semua foto setiap saat — path tetap sama walau foto diganti,
+// jadi cache tidak pernah menyajikan foto basi.
+const signedPhotoUrlCache = new Map();
 const getSignedPhotoUrl = async (value) => {
   if (!supabase || !value) return value || "";
   const path = getPhotoPath(value);
   if (!path || (path.startsWith("http") && path === value)) return value;
+  const cached = signedPhotoUrlCache.get(path);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
   const { data, error } = await supabase.storage
     .from("profile-photos")
     .createSignedUrl(path, 60 * 60);
   // URL lama (public atau signed) tetap bisa dipakai. Untuk path private,
   // selalu buat URL baru agar foto yang baru diunggah langsung tampil.
-  return error ? (path.startsWith("http") ? value : "") : data.signedUrl;
+  if (error) return path.startsWith("http") ? value : "";
+  signedPhotoUrlCache.set(path, {
+    url: data.signedUrl,
+    expiresAt: Date.now() + 50 * 60 * 1000,
+  });
+  return data.signedUrl;
 };
 
 const showAppMessage = (message, type = "success") =>
@@ -287,7 +314,7 @@ function App() {
   if (!authReady)
     return (
       <div className="auth-loading">
-        <ShieldCheck size={28} />
+        <BadgeCheck size={28} />
         <b>Memeriksa sesi login...</b>
       </div>
     );
@@ -312,9 +339,12 @@ function App() {
           ["qr", "QR Absensi", QrCode],
           ["monitor", "Monitoring", CalendarDays],
           ["interns", "Anak Magang", Users],
-          ["requests", "Pengajuan", FileText],
+          ["requests", "Kelola Pengajuan", FileText],
+          ["attendance-edit", "Edit Absensi", ClipboardEdit],
           ["reports", "Laporan", FileText],
+          ["audit-log", "Log Aktivitas", FileClock],
           ["settings", "Pengaturan", Settings],
+          ["profile", "Profil", UserCog],
         ]
       : [
           ["dashboard", "Beranda", Home],
@@ -344,7 +374,7 @@ function App() {
       <aside>
         <div className="brand">
           <span className="brand-mark">
-            <ShieldCheck />
+            <BadgeCheck />
           </span>
           <span>
             Hadir<span>in</span>
@@ -409,7 +439,15 @@ function App() {
                 onClose={() => setNotificationsOpen(false)}
               />
             )}
-            <div className="avatar">{user.initials}</div>
+            <button
+              type="button"
+              className="avatar header-avatar-btn"
+              onClick={() => setPage("profile")}
+              aria-label="Lihat profil"
+              title="Profil"
+            >
+              {!user.photo_url && user.initials}
+            </button>
           </div>
         </header>
         {content}
@@ -519,8 +557,11 @@ function Login({ onLogin }) {
       setLoading(false);
       return;
     }
+    const photoPath = getPhotoPath(profile.photo_url || "");
     onLogin({
       ...profile,
+      photo_path: photoPath,
+      photo_url: await getSignedPhotoUrl(photoPath),
       initials: profile.name
         .split(" ")
         .map((x) => x[0])
@@ -535,7 +576,7 @@ function Login({ onLogin }) {
       <section className="login-copy">
         <div className="brand">
           <span className="brand-mark">
-            <ShieldCheck />
+            <BadgeCheck />
           </span>
           Hadir<span>in</span>
         </div>
@@ -562,13 +603,14 @@ function Login({ onLogin }) {
           </span>
           <h2>Masuk ke akun Anda</h2>
           <p>Gunakan akun terdaftar untuk melanjutkan.</p>
-          <form onSubmit={submit}>
+          <form onSubmit={submit} autoComplete="off">
             <label>
               Email atau username
               <input
                 name="email"
                 type="email"
                 placeholder="nama@instansi.go.id"
+                autoComplete="off"
                 required
               />
             </label>
@@ -578,6 +620,7 @@ function Login({ onLogin }) {
                 name="password"
                 type="password"
                 placeholder="••••••••"
+                autoComplete="new-password"
                 required
               />
             </label>
@@ -784,7 +827,15 @@ function InternDashboard({ user, record, nav, attendance }) {
       </div>
       <section className="status-grid">
         <div className="status-card">
-          <div className="avatar large">{user.initials}</div>
+          {user.photo_url ? (
+            <img
+              className="avatar large table-photo"
+              src={user.photo_url}
+              alt={user.name}
+            />
+          ) : (
+            <div className="avatar large">{user.initials}</div>
+          )}
           <div>
             <small>STATUS KEHADIRAN</small>
             <h3>
@@ -965,26 +1016,33 @@ function Scanner({ record, onDone, onCancel }) {
   };
   useEffect(() => {
     if (!userLocation || !cameraReady) return;
-    scanner.current = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 220, height: 220 },
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-      },
-      false,
-    );
-    scanner.current.render(
-      async (decoded) => {
-        if (busy.current) return;
-        busy.current = true;
-        const success = await onDone(decoded, locationRef.current);
-        if (success) scanner.current.clear().catch(() => {});
-        else busy.current = false;
-      },
-      () => {},
-    );
-    return () => scanner.current?.clear().catch(() => {});
+    const html5Qrcode = new Html5Qrcode("qr-reader");
+    scanner.current = html5Qrcode;
+    // Paksa kamera belakang secara eksplisit. Tanpa constraint ini, browser
+    // kadang memilih kamera depan (urutan enumerasi kamera berbeda-beda
+    // per perangkat), jadi tidak bisa mengandalkan pemilihan otomatis library.
+    html5Qrcode
+      .start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        async (decoded) => {
+          if (busy.current) return;
+          busy.current = true;
+          const success = await onDone(decoded, locationRef.current);
+          if (success) html5Qrcode.stop().catch(() => {});
+          else busy.current = false;
+        },
+        () => {},
+      )
+      .catch(() =>
+        setError("Tidak dapat membuka kamera belakang. Coba lagi."),
+      );
+    return () => {
+      html5Qrcode
+        .stop()
+        .catch(() => {})
+        .finally(() => html5Qrcode.clear());
+    };
   }, [userLocation, cameraReady]);
   return (
     <div className="scanner-page">
@@ -1038,7 +1096,15 @@ function Scanner({ record, onDone, onCancel }) {
   );
 }
 function History({ data }) {
-  const rows = [...data].sort((a, b) => b.date.localeCompare(a.date));
+  const [historyDate, setHistoryDate] = useState(""),
+    [historyMonth, setHistoryMonth] = useState(""),
+    [historyStatus, setHistoryStatus] = useState("Semua");
+  const rows = [...data]
+    .filter((x) =>
+      historyDate ? x.date === historyDate : !historyMonth || x.date.startsWith(historyMonth),
+    )
+    .filter((x) => historyStatus === "Semua" || x.status === historyStatus)
+    .sort((a, b) => b.date.localeCompare(a.date));
   return (
     <div className="panel table-panel">
       <div className="panel-heading">
@@ -1046,9 +1112,38 @@ function History({ data }) {
           <h2>Riwayat Absensi</h2>
           <p>Catatan kehadiran magang Anda</p>
         </div>
-        <button className="filter">
-          <CalendarDays size={16} /> Semua riwayat
-        </button>
+      </div>
+      <div className="history-filters">
+        <input
+          type="date"
+          value={historyDate}
+          onChange={(event) => {
+            setHistoryDate(event.target.value);
+            if (event.target.value) setHistoryMonth("");
+          }}
+          aria-label="Filter tanggal absensi"
+        />
+        <input
+          type="month"
+          value={historyMonth}
+          onChange={(event) => {
+            setHistoryMonth(event.target.value);
+            if (event.target.value) setHistoryDate("");
+          }}
+          aria-label="Filter bulan absensi"
+        />
+        <select
+          value={historyStatus}
+          onChange={(event) => setHistoryStatus(event.target.value)}
+          aria-label="Filter status absensi"
+        >
+          <option>Semua</option>
+          <option>Hadir</option>
+          <option>Terlambat</option>
+          <option>Izin</option>
+          <option>Sakit</option>
+          <option>Alpa</option>
+        </select>
       </div>
       {rows.length ? (
         <table>
@@ -1071,7 +1166,14 @@ function History({ data }) {
                 <td>
                   <span
                     className={
-                      "badge " + (x.status === "Terlambat" ? "orange" : "green")
+                      "badge " +
+                      ({
+                        Hadir: "green",
+                        Terlambat: "orange",
+                        Izin: "blue",
+                        Sakit: "purple",
+                        Alpa: "red",
+                      }[x.status] || "gray")
                     }
                   >
                     {x.status}
@@ -1082,7 +1184,11 @@ function History({ data }) {
           </tbody>
         </table>
       ) : (
-        <p className="empty-state">Belum ada riwayat absensi.</p>
+        <p className="empty-state">
+          {data.length
+            ? "Tidak ada riwayat sesuai filter."
+            : "Belum ada riwayat absensi."}
+        </p>
       )}
     </div>
   );
@@ -1307,15 +1413,6 @@ function AdminPage({ page, nav, flash }) {
           .map(async (p) => {
           const a = byUser.get(p.id);
           const signedPhotoUrl = await getSignedPhotoUrl(p.photo_url);
-          const time = (v) =>
-            v
-              ? new Intl.DateTimeFormat("id-ID", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                  timeZone: "Asia/Jakarta",
-                }).format(new Date(v))
-              : "-";
           return {
             id: p.id,
             name: p.name,
@@ -1331,8 +1428,8 @@ function AdminPage({ page, nav, flash }) {
               .toUpperCase(),
             university: p.university || "",
             major: p.major || "",
-            in: time(a?.check_in),
-            out: time(a?.check_out),
+            in: formatTime(a?.check_in),
+            out: formatTime(a?.check_out),
             checkoutPending: Boolean(a?.check_in && !a?.check_out),
             is_active: p.is_active,
             status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
@@ -1389,9 +1486,13 @@ function AdminPage({ page, nav, flash }) {
       />
     );
   if (page === "requests")
-    return <AdminWorkflows rows={rows} refresh={load} flash={flash} />;
+    return <AdminLeaveRequests rows={rows} flash={flash} />;
+  if (page === "attendance-edit")
+    return <AdminAttendanceEdit rows={rows} refresh={load} flash={flash} />;
   if (page === "reports") return <Reports flash={flash} rows={rows} />;
+  if (page === "audit-log") return <AdminAuditLog rows={rows} flash={flash} />;
   if (page === "settings") return <SettingsPage />;
+  if (page === "profile") return <AccountSettings />;
   return <AdminDashboard rows={rows} nav={nav} loading={loading} />;
 }
 function AdminDashboard({ rows, nav, loading }) {
@@ -1434,8 +1535,8 @@ function AdminDashboard({ rows, nav, loading }) {
     </>
   );
 }
-function AttendanceTable({ rows, onEdit, onDelete, showAttendance = true }) {
-  const manageable = !!(onEdit || onDelete);
+function AttendanceTable({ rows, onEdit, onDelete, onHistory, showAttendance = true }) {
+  const manageable = !!(onEdit || onDelete || onHistory);
   return (
     <table>
       <thead>
@@ -1505,6 +1606,11 @@ function AttendanceTable({ rows, onEdit, onDelete, showAttendance = true }) {
             )}
             {manageable && (
               <td className="table-actions">
+                {onHistory && (
+                  <button className="text-btn" onClick={() => onHistory(x)}>
+                    Riwayat
+                  </button>
+                )}
                 {onEdit && (
                   <button className="text-btn" onClick={() => onEdit(x)}>
                     Edit
@@ -1790,19 +1896,31 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
     [editing, setEditing] = useState(null),
     [deleting, setDeleting] = useState(null),
     [query, setQuery] = useState(""),
-    [currentPage, setCurrentPage] = useState(1);
+    [durationFilter, setDurationFilter] = useState("Semua"),
+    [currentPage, setCurrentPage] = useState(1),
+    [viewingHistory, setViewingHistory] = useState(null),
+    [importOpen, setImportOpen] = useState(false);
+  const internshipStage = (row) => {
+    if (!row.internship_start && !row.internship_end) return "Tidak Diketahui";
+    if (row.internship_start && row.internship_start > today) return "Belum Mulai";
+    if (row.internship_end && row.internship_end < today) return "Selesai";
+    return "Aktif";
+  };
   const filteredRows = rows.filter((row) => {
     const searchable = [row.name, row.email, row.university, row.major]
       .filter(Boolean)
       .join(" ")
       .toLocaleLowerCase("id-ID");
-    return searchable.includes(query.toLocaleLowerCase("id-ID"));
+    const matchesQuery = searchable.includes(query.toLocaleLowerCase("id-ID"));
+    const matchesDuration =
+      durationFilter === "Semua" || internshipStage(row) === durationFilter;
+    return matchesQuery && matchesDuration;
   });
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const activePage = Math.min(currentPage, totalPages);
   const visibleRows = filteredRows.slice((activePage - 1) * pageSize, activePage * pageSize);
-  useEffect(() => setCurrentPage(1), [query]);
+  useEffect(() => setCurrentPage(1), [query, durationFilter]);
   const close = () => {
     setOpen(false);
     setEditing(null);
@@ -1935,28 +2053,46 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
               : `Menampilkan ${filteredRows.length} dari ${rows.length} anak magang.`}
           </p>
         </div>
-        <button
-          className="primary"
-          onClick={() => {
-            setEditing(null);
-            setOpen(true);
-          }}
-        >
-          + Tambah Anak Magang
-        </button>
+        <div className="panel-heading-actions">
+          <button className="outline" onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet size={16} /> Import CSV/Excel
+          </button>
+          <button
+            className="primary"
+            onClick={() => {
+              setEditing(null);
+              setOpen(true);
+            }}
+          >
+            + Tambah Anak Magang
+          </button>
+        </div>
       </div>
       <DataLoadError message={loadError} loading={loading} onRetry={onRetry} />
-      <div className="search" aria-label="Cari anak magang">
-        <Search size={18} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Cari nama, universitas, atau jurusan..."
-          aria-label="Cari nama, universitas, atau jurusan"
-        />
+      <div className="history-filters">
+        <div className="search" aria-label="Cari anak magang">
+          <Search size={18} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cari nama, universitas, atau jurusan..."
+            aria-label="Cari nama, universitas, atau jurusan"
+          />
+        </div>
+        <select
+          value={durationFilter}
+          onChange={(event) => setDurationFilter(event.target.value)}
+          aria-label="Filter masa magang"
+        >
+          <option value="Semua">Semua masa magang</option>
+          <option value="Aktif">Sedang aktif</option>
+          <option value="Belum Mulai">Belum mulai</option>
+          <option value="Selesai">Sudah selesai</option>
+        </select>
       </div>
       <AttendanceTable
         rows={visibleRows}
+        onHistory={setViewingHistory}
         onEdit={edit}
         onDelete={setDeleting}
         showAttendance={false}
@@ -2055,13 +2191,328 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
           confirmDisabled={deletingInProgress}
         />
       )}
+      {viewingHistory && (
+        <InternHistoryModal
+          intern={viewingHistory}
+          onClose={() => setViewingHistory(null)}
+        />
+      )}
+      {importOpen && (
+        <BulkImportModal
+          onClose={() => setImportOpen(false)}
+          refresh={refresh}
+          flash={flash}
+        />
+      )}
     </div>
   );
 }
 
+function InternHistoryModal({ intern, onClose }) {
+  const [rows, setRows] = useState([]),
+    [loading, setLoading] = useState(true),
+    [historyDate, setHistoryDate] = useState(""),
+    [historyMonth, setHistoryMonth] = useState(""),
+    [historyStatus, setHistoryStatus] = useState("Semua");
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    supabase
+      .from("attendance")
+      .select("date,check_in,check_out,status")
+      .eq("user_id", intern.id)
+      .order("date", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) return;
+        setRows(data || []);
+        setLoading(false);
+      });
+  }, [intern.id]);
+  const filtered = rows
+    .filter((x) =>
+      historyDate ? x.date === historyDate : !historyMonth || x.date.startsWith(historyMonth),
+    )
+    .filter((x) => historyStatus === "Semua" || x.status === historyStatus);
+  return (
+    <div className="modal-backdrop">
+      <div className="modal history-modal">
+        <button type="button" className="modal-close" onClick={onClose}>
+          <X size={20} />
+        </button>
+        <h2>Riwayat Absensi</h2>
+        <p>
+          {intern.name} · {intern.university || "-"}
+        </p>
+        <div className="history-filters">
+          <input
+            type="date"
+            value={historyDate}
+            onChange={(event) => {
+              setHistoryDate(event.target.value);
+              if (event.target.value) setHistoryMonth("");
+            }}
+            aria-label="Filter tanggal absensi"
+          />
+          <input
+            type="month"
+            value={historyMonth}
+            onChange={(event) => {
+              setHistoryMonth(event.target.value);
+              if (event.target.value) setHistoryDate("");
+            }}
+            aria-label="Filter bulan absensi"
+          />
+          <select
+            value={historyStatus}
+            onChange={(event) => setHistoryStatus(event.target.value)}
+            aria-label="Filter status absensi"
+          >
+            <option>Semua</option>
+            <option>Hadir</option>
+            <option>Terlambat</option>
+            <option>Izin</option>
+            <option>Sakit</option>
+            <option>Alpa</option>
+          </select>
+        </div>
+        {loading ? (
+          <p className="empty-state">Memuat riwayat...</p>
+        ) : filtered.length ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Jam Masuk</th>
+                <th>Jam Pulang</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((x, i) => (
+                <tr key={i}>
+                  <td>
+                    <b>{formatDate(x.date)}</b>
+                  </td>
+                  <td>{formatTime(x.check_in)}</td>
+                  <td>{formatTime(x.check_out)}</td>
+                  <td>
+                    <span
+                      className={
+                        "badge " +
+                        ({
+                          Hadir: "green",
+                          Terlambat: "orange",
+                          Izin: "blue",
+                          Sakit: "purple",
+                          Alpa: "red",
+                        }[x.status] || "gray")
+                      }
+                    >
+                      {x.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="empty-state">
+            {rows.length ? "Tidak ada riwayat sesuai filter." : "Belum ada riwayat absensi."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+function BulkImportModal({ onClose, refresh, flash }) {
+  const [parsedRows, setParsedRows] = useState([]),
+    [parseError, setParseError] = useState(""),
+    [importing, setImporting] = useState(false),
+    [results, setResults] = useState(null);
+  const downloadTemplate = () => {
+    const content =
+      "Nama,Email,Universitas,Jurusan,Tanggal Mulai (YYYY-MM-DD),Tanggal Selesai (YYYY-MM-DD)\n" +
+      "Contoh Nama,contoh@email.com,Universitas Indonesia,Ilmu Komputer,2026-01-01,2026-06-30\n";
+    const url = URL.createObjectURL(
+      new Blob([content], { type: "text/csv;charset=utf-8;" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "template-import-anak-magang.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const pick = (row, keys) => {
+    const foundKey = Object.keys(row).find((k) =>
+      keys.includes(k.toLowerCase().trim()),
+    );
+    return foundKey ? String(row[foundKey] ?? "").trim() : "";
+  };
+  const handleFile = async (event) => {
+    const picked = event.target.files?.[0];
+    setParseError("");
+    setResults(null);
+    setParsedRows([]);
+    if (!picked) return;
+    try {
+      const XLSX = await import("xlsx");
+      const isCsv = picked.name.toLowerCase().endsWith(".csv");
+      const workbook = isCsv
+        ? XLSX.read(await picked.text(), { type: "string" })
+        : XLSX.read(await picked.arrayBuffer(), { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const mapped = raw
+        .map((row) => ({
+          name: pick(row, ["nama", "name"]),
+          email: pick(row, ["email"]).toLowerCase(),
+          university: pick(row, ["universitas", "university"]),
+          major: pick(row, ["jurusan", "major"]),
+          internship_start: pick(row, [
+            "tanggal mulai (yyyy-mm-dd)",
+            "tanggal mulai",
+            "mulai",
+            "internship_start",
+          ]),
+          internship_end: pick(row, [
+            "tanggal selesai (yyyy-mm-dd)",
+            "tanggal selesai",
+            "selesai",
+            "internship_end",
+          ]),
+        }))
+        .filter((row) => row.name || row.email);
+      if (!mapped.length) {
+        setParseError(
+          "Tidak ada baris data yang terbaca. Pastikan file memakai kolom sesuai template.",
+        );
+        return;
+      }
+      setParsedRows(mapped);
+    } catch {
+      setParseError(
+        "File tidak dapat dibaca. Gunakan format .csv atau .xlsx sesuai template.",
+      );
+    }
+  };
+  const generatePassword = () => {
+    const bytes = new Uint8Array(9);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(36).padStart(2, "0"))
+      .join("")
+      .slice(0, 10);
+  };
+  const runImport = async () => {
+    if (!supabase) return flash("Import massal memerlukan Supabase.", "error");
+    setImporting(true);
+    const outcomes = [];
+    for (const row of parsedRows) {
+      if (!row.name || !row.email) {
+        outcomes.push({ ...row, ok: false, message: "Nama atau email kosong" });
+        continue;
+      }
+      const password = generatePassword();
+      const { error } = await supabase.functions.invoke("create-intern", {
+        body: { ...row, password },
+      });
+      if (error) {
+        let message = error.message || "Gagal membuat akun";
+        try {
+          const body = await error.context?.json();
+          message = body.error || message;
+        } catch {}
+        outcomes.push({ ...row, ok: false, message });
+      } else {
+        outcomes.push({ ...row, ok: true, password });
+      }
+    }
+    setImporting(false);
+    setResults(outcomes);
+    const successCount = outcomes.filter((o) => o.ok).length;
+    if (successCount) {
+      flash(`${successCount} dari ${outcomes.length} akun berhasil dibuat.`);
+      refresh();
+    } else {
+      flash("Tidak ada akun yang berhasil dibuat.", "error");
+    }
+  };
+  return (
+    <div className="modal-backdrop">
+      <div className="modal import-modal">
+        <button type="button" className="modal-close" onClick={onClose}>
+          <X size={20} />
+        </button>
+        <h2>Import Anak Magang</h2>
+        <p>Unggah file CSV atau Excel untuk menambah banyak akun sekaligus.</p>
+        <button type="button" className="outline" onClick={downloadTemplate}>
+          <Download size={16} /> Unduh template
+        </button>
+        <label>
+          File CSV/Excel
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} />
+        </label>
+        {parseError && <p className="error">{parseError}</p>}
+        {!!parsedRows.length && !results && (
+          <>
+            <p className="settings-note">
+              {parsedRows.length} baris siap diimpor. Kata sandi dibuat otomatis
+              untuk tiap akun.
+            </p>
+            <button
+              className="primary full"
+              disabled={importing}
+              onClick={runImport}
+            >
+              {importing ? "Mengimpor..." : `Impor ${parsedRows.length} akun`}
+            </button>
+          </>
+        )}
+        {results && (
+          <>
+            <div className="import-summary">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Email</th>
+                    <th>Kata sandi</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.name || "-"}</td>
+                      <td>{r.email || "-"}</td>
+                      <td>{r.ok ? r.password : "-"}</td>
+                      <td className={r.ok ? "" : "import-row-error"}>
+                        {r.ok ? "Berhasil" : r.message}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="settings-note">
+              Salin kata sandi di atas sekarang — tidak disimpan dan tidak
+              dapat dilihat lagi setelah jendela ini ditutup.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 function LeaveRequests({ user, flash }) {
   const [requests, setRequests] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [type, setType] = useState("Izin");
+  const [historyStatus, setHistoryStatus] = useState("Semua");
+  const [historyType, setHistoryType] = useState("Semua");
+  const [historyDate, setHistoryDate] = useState("");
+  const [historyMonth, setHistoryMonth] = useState("");
   const load = async () => {
     if (!supabase) return;
     const { data, error } = await supabase
@@ -2095,44 +2546,78 @@ function LeaveRequests({ user, flash }) {
     if (!supabase)
       return flash("Fitur pengajuan memerlukan Supabase.", "error");
     const form = new FormData(event.currentTarget);
+    const requestType = form.get("type");
+    const dateFrom = form.get("date_from");
     setSaving(true);
     const { error } = await supabase.from("leave_requests").insert({
       user_id: user.id,
-      type: form.get("type"),
-      date_from: form.get("date_from"),
-      date_to: form.get("date_to"),
+      type: requestType,
+      date_from: dateFrom,
+      date_to: requestType === "Lupa Absen" ? dateFrom : form.get("date_to"),
       reason: form.get("reason"),
     });
     setSaving(false);
     if (error) return flash(error.message, "error");
     event.currentTarget.reset();
+    setType("Izin");
     flash("Pengajuan berhasil dikirim.");
     load();
   };
+  const historyRequests = requests.filter((item) => {
+    const matchesStatus =
+      historyStatus === "Semua" || item.status === historyStatus;
+    const matchesType = historyType === "Semua" || item.type === historyType;
+    const matchesPeriod = historyDate
+      ? historyDate >= item.date_from && historyDate <= item.date_to
+      : !historyMonth || item.date_from.startsWith(historyMonth);
+    return matchesStatus && matchesType && matchesPeriod;
+  });
   return (
     <div className="workflow-grid">
       <form className="panel settings" onSubmit={submit}>
-        <h2>Ajukan izin atau sakit</h2>
+        <h2>Ajukan izin, sakit, atau lupa absen</h2>
         <label>
           Jenis
-          <select name="type">
+          <select
+            name="type"
+            value={type}
+            onChange={(event) => setType(event.target.value)}
+          >
             <option>Izin</option>
             <option>Sakit</option>
+            <option>Lupa Absen</option>
           </select>
         </label>
-        <div className="form-grid">
+        {type === "Lupa Absen" ? (
           <label>
-            Mulai
+            Tanggal
             <input type="date" name="date_from" required />
           </label>
-          <label>
-            Selesai
-            <input type="date" name="date_to" required />
-          </label>
-        </div>
+        ) : (
+          <div className="form-grid">
+            <label>
+              Mulai
+              <input type="date" name="date_from" required />
+            </label>
+            <label>
+              Selesai
+              <input type="date" name="date_to" required />
+            </label>
+          </div>
+        )}
         <label>
           Alasan
-          <textarea name="reason" rows="4" minLength="5" required />
+          <textarea
+            name="reason"
+            rows="4"
+            minLength="5"
+            required
+            placeholder={
+              type === "Lupa Absen"
+                ? "Contoh: Lupa scan QR saat datang jam 07:50, mohon dikoreksi."
+                : undefined
+            }
+          />
         </label>
         <button className="primary" disabled={saving}>
           {saving ? "Mengirim..." : "Kirim pengajuan"}
@@ -2140,13 +2625,41 @@ function LeaveRequests({ user, flash }) {
       </form>
       <div className="panel">
         <h2>Riwayat pengajuan</h2>
-        {requests.length ? (
-          requests.map((item) => (
+        <div className="history-filters">
+          <input
+            type="date"
+            value={historyDate}
+            onChange={(event) => {
+              setHistoryDate(event.target.value);
+              if (event.target.value) setHistoryMonth("");
+            }}
+            aria-label="Filter tanggal pengajuan"
+          />
+          <input
+            type="month"
+            value={historyMonth}
+            onChange={(event) => {
+              setHistoryMonth(event.target.value);
+              if (event.target.value) setHistoryDate("");
+            }}
+            aria-label="Filter bulan pengajuan"
+          />
+          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
+            <option>Semua</option><option>Izin</option><option>Sakit</option><option>Lupa Absen</option>
+          </select>
+          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
+            <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
+          </select>
+        </div>
+        {historyRequests.length ? (
+          historyRequests.map((item) => (
             <div className="workflow-item" key={item.id}>
               <div>
                 <b>{item.type}</b>
                 <p>
-                  {formatDate(item.date_from)} – {formatDate(item.date_to)}
+                  {item.date_from === item.date_to
+                    ? formatDate(item.date_from)
+                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
                 </p>
                 <small>{item.reason}</small>
                 {item.status === "Ditolak" && item.rejection_reason && (
@@ -2161,18 +2674,21 @@ function LeaveRequests({ user, flash }) {
             </div>
           ))
         ) : (
-          <p className="empty-state">Belum ada pengajuan.</p>
+          <p className="empty-state">
+            {requests.length ? "Tidak ada pengajuan sesuai filter." : "Belum ada pengajuan."}
+          </p>
         )}
       </div>
     </div>
   );
 }
 
-function AdminWorkflows({ rows, refresh, flash }) {
+function AdminLeaveRequests({ rows, flash }) {
   const [requests, setRequests] = useState([]);
   const [rejecting, setRejecting] = useState(null);
   const [historyStatus, setHistoryStatus] = useState("Semua");
   const [historyType, setHistoryType] = useState("Semua");
+  const [historyDate, setHistoryDate] = useState("");
   const [historyMonth, setHistoryMonth] = useState("");
   const load = async () => {
     if (!supabase) return;
@@ -2196,23 +2712,6 @@ function AdminWorkflows({ rows, refresh, flash }) {
     flash(`Pengajuan ${decision.toLowerCase()}.`);
     load();
   };
-  const correct = async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const { error } = await supabase.rpc("correct_attendance", {
-      target_user_id: form.get("user_id"),
-      target_date: form.get("date"),
-      new_check_in: form.get("check_in") || null,
-      new_check_out: form.get("check_out") || null,
-      new_status: form.get("status"),
-      correction_reason: form.get("reason"),
-    });
-    if (error) return flash(error.message, "error");
-    flash("Koreksi absensi berhasil disimpan.");
-    event.currentTarget.reset();
-    refresh();
-    load();
-  };
   const remind = async () => {
     const { data, error } = await supabase.rpc("generate_absence_reminders");
     if (error) return flash(error.message, "error");
@@ -2225,16 +2724,18 @@ function AdminWorkflows({ rows, refresh, flash }) {
     const matchesStatus =
       historyStatus === "Semua" || item.status === historyStatus;
     const matchesType = historyType === "Semua" || item.type === historyType;
-    const matchesMonth = !historyMonth || item.date_from.startsWith(historyMonth);
-    return matchesStatus && matchesType && matchesMonth;
+    const matchesPeriod = historyDate
+      ? historyDate >= item.date_from && historyDate <= item.date_to
+      : !historyMonth || item.date_from.startsWith(historyMonth);
+    return matchesStatus && matchesType && matchesPeriod;
   });
   return (
     <div className="admin-workflows">
       <div className="panel">
         <div className="section-head">
           <div>
-            <h2>Persetujuan izin/sakit</h2>
-            <p>Periksa pengajuan anak magang.</p>
+            <h2>Persetujuan pengajuan</h2>
+            <p>Periksa izin, sakit, dan lupa absen anak magang.</p>
           </div>
           <button className="outline" onClick={remind}>
             <Bell size={16} /> Kirim pengingat
@@ -2248,7 +2749,9 @@ function AdminWorkflows({ rows, refresh, flash }) {
                   {nameOf(item.user_id)} · {item.type}
                 </b>
                 <p>
-                  {formatDate(item.date_from)} – {formatDate(item.date_to)}
+                  {item.date_from === item.date_to
+                    ? formatDate(item.date_from)
+                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
                 </p>
                 <small>{item.reason}</small>
               </div>
@@ -2280,8 +2783,102 @@ function AdminWorkflows({ rows, refresh, flash }) {
           <p className="empty-state">Belum ada pengajuan.</p>
         )}
       </div>
+      <div className="panel audit-panel">
+        <div className="section-head">
+          <div>
+            <h2>Riwayat pengajuan</h2>
+            <p>Semua pengajuan izin, sakit, dan lupa absen yang telah dikirim.</p>
+          </div>
+        </div>
+        <div className="history-filters">
+          <input
+            type="date"
+            value={historyDate}
+            onChange={(event) => {
+              setHistoryDate(event.target.value);
+              if (event.target.value) setHistoryMonth("");
+            }}
+            aria-label="Filter tanggal pengajuan"
+          />
+          <input
+            type="month"
+            value={historyMonth}
+            onChange={(event) => {
+              setHistoryMonth(event.target.value);
+              if (event.target.value) setHistoryDate("");
+            }}
+            aria-label="Filter bulan pengajuan"
+          />
+          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
+            <option>Semua</option><option>Izin</option><option>Sakit</option><option>Lupa Absen</option>
+          </select>
+          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
+            <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
+          </select>
+        </div>
+        {historyRequests.length ? (
+          historyRequests.map((item) => (
+            <div className="workflow-item" key={item.id}>
+              <div>
+                <b>{nameOf(item.user_id)} · {item.type}</b>
+                <p>
+                  {item.date_from === item.date_to
+                    ? formatDate(item.date_from)
+                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
+                </p>
+                <small>{item.reason}</small>
+                {item.status === "Ditolak" && item.rejection_reason && <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>}
+              </div>
+              <span className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}>
+                {item.status}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="empty-state">Tidak ada pengajuan sesuai filter.</p>
+        )}
+      </div>
+      {rejecting && (
+        <div className="modal-backdrop">
+          <form className="modal" onSubmit={async (event) => {
+            event.preventDefault();
+            const note = new FormData(event.currentTarget).get("rejection_reason");
+            await review(rejecting.id, "Ditolak", note);
+            setRejecting(null);
+          }}>
+            <button type="button" className="modal-close" onClick={() => setRejecting(null)}><X size={18} /></button>
+            <h2>Tolak pengajuan</h2>
+            <p>Tulis alasan penolakan agar dapat dilihat oleh {nameOf(rejecting.user_id)}.</p>
+            <label>Alasan penolakan<textarea name="rejection_reason" minLength="5" rows="4" required autoFocus /></label>
+            <button className="primary full">Kirim penolakan</button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+function AdminAttendanceEdit({ rows, refresh, flash }) {
+  const correct = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const { error } = await supabase.rpc("correct_attendance", {
+      target_user_id: form.get("user_id"),
+      target_date: form.get("date"),
+      new_check_in: form.get("check_in") || null,
+      new_check_out: form.get("check_out") || null,
+      new_status: form.get("status"),
+      correction_reason: form.get("reason"),
+    });
+    if (error) return flash(error.message, "error");
+    flash("Koreksi absensi berhasil disimpan.");
+    event.currentTarget.reset();
+    refresh();
+  };
+  return (
+    <div className="admin-workflows">
       <form className="panel settings" onSubmit={correct}>
         <h2>Koreksi absensi</h2>
+        <p>Perbaiki jam masuk, jam pulang, atau status absensi anak magang.</p>
         <label>
           Anak magang
           <select name="user_id" required>
@@ -2323,61 +2920,198 @@ function AdminWorkflows({ rows, refresh, flash }) {
         </label>
         <button className="primary">Simpan koreksi</button>
       </form>
-      <div className="panel audit-panel">
-        <div className="section-head">
-          <div>
-            <h2>Riwayat pengajuan</h2>
-            <p>Semua pengajuan izin dan sakit yang telah dikirim.</p>
-          </div>
+    </div>
+  );
+}
+
+const AUDIT_ACTION_LABELS = {
+  review_leave: "Persetujuan pengajuan",
+  correct_attendance: "Koreksi absensi",
+  generate_absence_reminders: "Pengingat absensi",
+  create_intern: "Tambah anak magang",
+  update_intern: "Ubah data anak magang",
+  delete_intern: "Hapus anak magang",
+  update_settings: "Ubah pengaturan",
+  logout: "Keluar akun",
+  profiles_update: "Ubah profil",
+  qr_sessions_insert: "Buat sesi QR",
+  qr_sessions_update: "Ubah sesi QR",
+  qr_sessions_delete: "Hapus sesi QR",
+};
+const describeAuditLog = (item, nameOf) => {
+  const d = item.details || {};
+  switch (item.action) {
+    case "review_leave":
+      return {
+        title: `Pengajuan ${nameOf(d.user_id)} ${d.decision || ""}`.trim(),
+        description: d.rejection_reason
+          ? `Alasan penolakan: ${d.rejection_reason}`
+          : "—",
+      };
+    case "correct_attendance":
+      return {
+        title: `Koreksi absensi ${nameOf(d.user_id)}${d.date ? " · " + formatDate(d.date) : ""}`,
+        description: `Status diubah ke ${d.status || "-"}. Alasan: ${d.reason || "-"}`,
+      };
+    case "generate_absence_reminders":
+      return {
+        title: "Kirim pengingat absensi",
+        description: `${d.count ?? 0} pengingat terkirim.`,
+      };
+    case "create_intern":
+      return {
+        title: "Tambah anak magang",
+        description: [d.email, d.university, d.major].filter(Boolean).join(" · ") || "—",
+      };
+    case "update_intern":
+      return {
+        title: `Ubah data anak magang ${nameOf(item.target_id)}`,
+        description: [d.email, d.university, d.major].filter(Boolean).join(" · ") || "—",
+      };
+    case "delete_intern":
+      return {
+        title: "Hapus anak magang",
+        description: [d.name, d.email].filter(Boolean).join(" · ") || "—",
+      };
+    case "update_settings":
+      return { title: "Ubah pengaturan absensi", description: "—" };
+    case "logout":
+      return { title: `${d.name || "Pengguna"} keluar akun`, description: "—" };
+    case "profiles_update":
+      return { title: "Ubah profil", description: "—" };
+    default:
+      if (item.action?.startsWith("qr_sessions_")) {
+        return { title: AUDIT_ACTION_LABELS[item.action] || item.action, description: "—" };
+      }
+      return { title: item.action, description: "—" };
+  }
+};
+function AdminAuditLog({ rows, flash }) {
+  const [logs, setLogs] = useState([]),
+    [loading, setLoading] = useState(true),
+    [loadError, setLoadError] = useState(""),
+    [actionFilter, setActionFilter] = useState("Semua"),
+    [historyDate, setHistoryDate] = useState(""),
+    [historyMonth, setHistoryMonth] = useState(""),
+    [expanded, setExpanded] = useState(null),
+    [currentPage, setCurrentPage] = useState(1);
+  const load = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError("");
+    const { data, error } = await supabase
+      .from("audit_logs")
+      .select("id,actor_id,action,target_id,details,created_at,actor:profiles(name)")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      setLoadError(error.message);
+      flash(error.message, "error");
+      setLoading(false);
+      return;
+    }
+    setLogs(data || []);
+    setLoading(false);
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  const nameOf = (id) => rows.find((row) => row.id === id)?.name || "anak magang";
+  const actionsPresent = [...new Set(logs.map((item) => item.action))];
+  const filtered = logs
+    .filter((item) => actionFilter === "Semua" || item.action === actionFilter)
+    .filter((item) =>
+      historyDate
+        ? item.created_at.slice(0, 10) === historyDate
+        : !historyMonth || item.created_at.startsWith(historyMonth),
+    );
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const visible = filtered.slice((activePage - 1) * pageSize, activePage * pageSize);
+  useEffect(() => setCurrentPage(1), [actionFilter, historyDate, historyMonth]);
+  return (
+    <div className="panel table-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>Log Aktivitas</h2>
+          <p>Riwayat aksi admin dan sistem untuk keperluan audit.</p>
         </div>
-        <div className="history-filters">
-          <input
-            type="month"
-            value={historyMonth}
-            onChange={(event) => setHistoryMonth(event.target.value)}
-            aria-label="Filter bulan pengajuan"
-          />
-          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
-            <option>Semua</option><option>Izin</option><option>Sakit</option>
-          </select>
-          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
-            <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
-          </select>
-        </div>
-        {historyRequests.length ? (
-          historyRequests.map((item) => (
+      </div>
+      <DataLoadError message={loadError} loading={loading} onRetry={load} />
+      <div className="history-filters">
+        <input
+          type="date"
+          value={historyDate}
+          onChange={(event) => {
+            setHistoryDate(event.target.value);
+            if (event.target.value) setHistoryMonth("");
+          }}
+          aria-label="Filter tanggal log"
+        />
+        <input
+          type="month"
+          value={historyMonth}
+          onChange={(event) => {
+            setHistoryMonth(event.target.value);
+            if (event.target.value) setHistoryDate("");
+          }}
+          aria-label="Filter bulan log"
+        />
+        <select
+          value={actionFilter}
+          onChange={(event) => setActionFilter(event.target.value)}
+          aria-label="Filter jenis aktivitas"
+        >
+          <option>Semua</option>
+          {actionsPresent.map((action) => (
+            <option key={action} value={action}>
+              {AUDIT_ACTION_LABELS[action] || action}
+            </option>
+          ))}
+        </select>
+      </div>
+      {visible.length ? (
+        visible.map((item) => {
+          const { title, description } = describeAuditLog(item, nameOf);
+          return (
             <div className="workflow-item" key={item.id}>
               <div>
-                <b>{nameOf(item.user_id)} · {item.type}</b>
-                <p>{formatDate(item.date_from)} – {formatDate(item.date_to)}</p>
-                <small>{item.reason}</small>
-                {item.status === "Ditolak" && item.rejection_reason && <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>}
+                <b>{title}</b>
+                <p>{description}</p>
+                <small>
+                  {item.actor?.name || "Sistem"} · {formatDate(item.created_at)}{" "}
+                  {formatTime(item.created_at)}
+                </small>
+                {expanded === item.id && (
+                  <pre className="audit-detail-json">
+                    {JSON.stringify(item.details, null, 2)}
+                  </pre>
+                )}
               </div>
-              <span className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}>
-                {item.status}
-              </span>
+              <button
+                className="text-btn"
+                onClick={() => setExpanded(expanded === item.id ? null : item.id)}
+              >
+                {expanded === item.id ? "Sembunyikan" : "Detail"}
+              </button>
             </div>
-          ))
-        ) : (
-          <p className="empty-state">Tidak ada pengajuan sesuai filter.</p>
-        )}
-      </div>
-      {rejecting && (
-        <div className="modal-backdrop">
-          <form className="modal" onSubmit={async (event) => {
-            event.preventDefault();
-            const note = new FormData(event.currentTarget).get("rejection_reason");
-            await review(rejecting.id, "Ditolak", note);
-            setRejecting(null);
-          }}>
-            <button type="button" className="modal-close" onClick={() => setRejecting(null)}><X size={18} /></button>
-            <h2>Tolak pengajuan</h2>
-            <p>Tulis alasan penolakan agar dapat dilihat oleh {nameOf(rejecting.user_id)}.</p>
-            <label>Alasan penolakan<textarea name="rejection_reason" minLength="5" rows="4" required autoFocus /></label>
-            <button className="primary full">Kirim penolakan</button>
-          </form>
-        </div>
+          );
+        })
+      ) : (
+        <p className="empty-state">
+          {logs.length ? "Tidak ada log sesuai filter." : "Belum ada log aktivitas."}
+        </p>
       )}
+      <TablePagination
+        page={activePage}
+        totalItems={filtered.length}
+        pageSize={pageSize}
+        onChange={setCurrentPage}
+      />
     </div>
   );
 }
@@ -2591,7 +3325,6 @@ function SettingsPage() {
           {saving ? "Menyimpan..." : "Simpan pengaturan"}
         </button>
       </form>
-      <AccountSettings />
     </>
   );
 }
