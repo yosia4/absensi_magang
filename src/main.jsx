@@ -141,6 +141,8 @@ const getTime = () =>
   }).format(new Date());
 const workStartKey = "magang-work-start-time";
 const getWorkStartTime = () => localStorage.getItem(workStartKey) || "08:00";
+const workEndKey = "magang-work-end-time";
+const getWorkEndTime = () => localStorage.getItem(workEndKey) || "16:00";
 const formatDate = (d) =>
   new Intl.DateTimeFormat("id-ID", {
     day: "numeric",
@@ -157,6 +159,17 @@ const formatTime = (v) =>
         timeZone: "Asia/Jakarta",
       }).format(new Date(v))
     : "-";
+
+const timeOfDayJakarta = (v) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(v));
+  const get = (t) => parts.find((x) => x.type === t).value;
+  return `${get("hour")}:${get("minute")}`;
+};
 
 const getPhotoPath = (value = "") => {
   const marker = "/profile-photos/";
@@ -1585,6 +1598,7 @@ function AdminPage({ page, nav, flash }) {
     const [
       { data: profiles, error: profileError },
       { data: attendances, error: attendanceError },
+      { data: settingsRow },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -1596,6 +1610,11 @@ function AdminPage({ page, nav, flash }) {
         .from("attendance")
         .select("user_id,check_in,check_out,status")
         .eq("date", selectedDate),
+      supabase
+        .from("system_settings")
+        .select("work_end_time")
+        .eq("id", 1)
+        .maybeSingle(),
     ]);
     if (profileError || attendanceError) {
       const message = (profileError || attendanceError).message;
@@ -1604,6 +1623,9 @@ function AdminPage({ page, nav, flash }) {
       setLoading(false);
       return;
     }
+    const workEndTime = settingsRow?.work_end_time
+      ? String(settingsRow.work_end_time).slice(0, 5)
+      : null;
     const byUser = new Map((attendances || []).map((a) => [a.user_id, a]));
     setRows(
       await Promise.all(
@@ -1632,6 +1654,11 @@ function AdminPage({ page, nav, flash }) {
             in: formatTime(a?.check_in),
             out: formatTime(a?.check_out),
             checkoutPending: Boolean(a?.check_in && !a?.check_out),
+            checkoutEarly: Boolean(
+              a?.check_out &&
+                workEndTime &&
+                timeOfDayJakarta(a.check_out) < workEndTime,
+            ),
             is_active: p.is_active,
             status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
           };
@@ -1787,7 +1814,14 @@ function AttendanceTable({
             <td>{x.university}</td>
             <td>{x.major}</td>
             {showAttendance && <td>{x.in}</td>}
-            {showAttendance && <td>{x.out}</td>}
+            {showAttendance && (
+              <td>
+                {x.out}
+                {x.checkoutEarly && (
+                  <small className="checkout-early">Pulang cepat</small>
+                )}
+              </td>
+            )}
             {showAttendance && (
               <td>
                 <span
@@ -3257,6 +3291,7 @@ function Reports({ flash, rows }) {
 function SettingsPage() {
   const [settings, setSettings] = useState({
       work_start_time: getWorkStartTime(),
+      work_end_time: getWorkEndTime(),
       late_tolerance_minutes: 0,
       work_days: [1, 2, 3, 4, 5],
       qr_enabled: true,
@@ -3274,6 +3309,7 @@ function SettingsPage() {
           setSettings({
             ...data,
             work_start_time: String(data.work_start_time).slice(0, 5),
+            work_end_time: String(data.work_end_time).slice(0, 5),
           });
       });
   }, []);
@@ -3284,6 +3320,7 @@ function SettingsPage() {
       id: 1,
       ...settings,
       work_start_time: settings.work_start_time + ":00",
+      work_end_time: settings.work_end_time + ":00",
     };
     const { error } = supabase
       ? await supabase
@@ -3296,6 +3333,7 @@ function SettingsPage() {
       return;
     }
     localStorage.setItem(workStartKey, settings.work_start_time);
+    localStorage.setItem(workEndKey, settings.work_end_time);
     showAppMessage("Pengaturan absensi berhasil disimpan.");
   };
   const toggleDay = (day) =>
@@ -3317,6 +3355,17 @@ function SettingsPage() {
             value={settings.work_start_time}
             onChange={(e) =>
               setSettings((s) => ({ ...s, work_start_time: e.target.value }))
+            }
+            required
+          />
+        </label>
+        <label>
+          Jam pulang normal
+          <input
+            type="time"
+            value={settings.work_end_time}
+            onChange={(e) =>
+              setSettings((s) => ({ ...s, work_end_time: e.target.value }))
             }
             required
           />

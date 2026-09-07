@@ -1865,6 +1865,13 @@ button.header-avatar-btn {
   font-weight: 700;
   white-space: nowrap;
 }
+.checkout-early {
+  display: block;
+  margin-top: 5px;
+  color: #b5730f;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .history-filters input,
 .history-filters select,
 .report-filter input,
