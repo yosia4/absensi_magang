@@ -23,7 +23,6 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
-  Menu,
   MoreHorizontal,
   QrCode,
   Search,
@@ -209,7 +208,6 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState("dashboard");
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [attendance, setAttendance] = useState(() =>
     JSON.parse(localStorage.getItem("magang-attendance") || "[]"),
@@ -368,13 +366,7 @@ function App() {
     );
   return (
     <div className="app-shell">
-      {mobileNavOpen && (
-        <div
-          className="mobile-nav-backdrop"
-          onClick={() => setMobileNavOpen(false)}
-        />
-      )}
-      <aside className={mobileNavOpen ? "mobile-nav-open" : ""}>
+      <aside>
         <div className="brand">
           <span className="brand-mark">
             <BadgeCheck />
@@ -387,10 +379,7 @@ function App() {
         {nav.map(([id, label, Icon]) => (
           <button
             className={"nav-item " + (page === id ? "active" : "")}
-            onClick={() => {
-              setPage(id);
-              setMobileNavOpen(false);
-            }}
+            onClick={() => setPage(id)}
             key={id}
           >
             <Icon size={19} />
@@ -407,14 +396,6 @@ function App() {
       </aside>
       <main>
         <header>
-          <button
-            type="button"
-            className="icon-btn hamburger-btn"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label="Buka menu"
-          >
-            <Menu size={20} />
-          </button>
           <div className="mobile-brand">
             Hadir<span>in</span>
           </div>

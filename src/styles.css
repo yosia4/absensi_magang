@@ -1039,36 +1039,12 @@ td {
 }
 .mobile-brand,
 .bottom-nav,
-.mobile-logout,
-.hamburger-btn,
-.mobile-nav-backdrop {
+.mobile-logout {
   display: none;
 }
 @media (max-width: 800px) {
   aside {
-    display: flex;
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: min(270px, 82vw);
-    z-index: 9;
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: 12px 0 30px #081a3340;
-    overflow-y: auto;
-  }
-  aside.mobile-nav-open {
-    transform: translateX(0);
-  }
-  .mobile-nav-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: #10213c80;
-    z-index: 8;
-  }
-  .hamburger-btn {
-    display: grid;
-    place-items: center;
+    display: none;
   }
   main {
     margin: 0;
