@@ -1049,7 +1049,7 @@ td {
   main {
     margin: 0;
     width: 100%;
-    padding: 0 17px 84px;
+    padding: 0 17px 96px;
   }
   header {
     height: 76px;
@@ -1076,29 +1076,46 @@ td {
     color: #c34747;
   }
   .bottom-nav {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 66px;
+    min-height: 66px;
+    padding: 6px 2px;
     background: white;
     border-top: 1px solid #e7edf3;
-    justify-content: space-around;
     z-index: 4;
   }
   .bottom-nav button {
     background: transparent;
     color: #8b98a8;
     display: flex;
+    min-width: 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 4px;
     font-size: 10px;
+    padding: 4px 2px;
   }
   .bottom-nav button.active {
     color: #168559;
+  }
+  .bottom-nav button span:last-child {
+    width: 100%;
+    text-align: center;
+    overflow-wrap: break-word;
+  }
+  .bottom-nav.compact button {
+    gap: 2px;
+    font-size: 8px;
+  }
+  .bottom-nav.compact button span {
+    line-height: 1.15;
+    text-align: center;
   }
   .hero {
     padding: 23px;

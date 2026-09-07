@@ -449,19 +449,17 @@ function App() {
         </header>
         {content}
       </main>
-      <nav className="bottom-nav">
-        {nav
-          .slice(0, user.role === "admin" ? 4 : 5)
-          .map(([id, label, Icon]) => (
-            <button
-              className={page === id ? "active" : ""}
-              onClick={() => setPage(id)}
-              key={id}
-            >
-              <Icon size={20} />
-              <span>{label}</span>
-            </button>
-          ))}
+      <nav className={"bottom-nav" + (nav.length > 5 ? " compact" : "")}>
+        {nav.map(([id, label, Icon]) => (
+          <button
+            className={page === id ? "active" : ""}
+            onClick={() => setPage(id)}
+            key={id}
+          >
+            <Icon size={nav.length > 5 ? 17 : 20} />
+            <span>{label}</span>
+          </button>
+        ))}
       </nav>
       {toast && (
         <div className={"toast " + toast.type}>
