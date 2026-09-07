@@ -209,6 +209,7 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState("dashboard");
   const [toast, setToast] = useState(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [attendance, setAttendance] = useState(() =>
     JSON.parse(localStorage.getItem("magang-attendance") || "[]"),
   );
@@ -230,10 +231,11 @@ function App() {
   }, []);
   useEffect(() => {
     if (!supabase) return;
+    const isRecoveryLink = window.location.hash.includes("type=recovery");
     supabase.auth
       .getSession()
       .then(async ({ data: { session } }) => {
-        if (!session?.user) return;
+        if (!session?.user || isRecoveryLink) return;
         const { data: profile } = await supabase
           .from("profiles")
           .select("*")
@@ -264,6 +266,8 @@ function App() {
             "Sesi Anda telah berakhir, silakan masuk kembali.",
             "error",
           );
+        } else if (event === "PASSWORD_RECOVERY") {
+          setRecoveryMode(true);
         }
       },
     );
@@ -327,6 +331,16 @@ function App() {
         <BadgeCheck size={28} />
         <b>Memeriksa sesi login...</b>
       </div>
+    );
+  if (recoveryMode)
+    return (
+      <ResetPassword
+        onDone={() => {
+          setRecoveryMode(false);
+          history.replaceState(null, "", window.location.pathname);
+        }}
+        flash={flash}
+      />
     );
   if (!user) return <Login onLogin={completeLogin} />;
   const logout = async () => {
@@ -499,7 +513,31 @@ function App() {
 function Login({ onLogin }) {
   const [admin, setAdmin] = useState(false),
     [error, setError] = useState(""),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(false),
+    [forgotMode, setForgotMode] = useState(false),
+    [forgotSent, setForgotSent] = useState(false),
+    [forgotLoading, setForgotLoading] = useState(false),
+    [forgotError, setForgotError] = useState("");
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    if (!supabase) {
+      setForgotError("Reset kata sandi hanya tersedia saat Supabase terhubung.");
+      return;
+    }
+    const email = String(new FormData(e.currentTarget).get("email")).trim();
+    setForgotLoading(true);
+    setForgotError("");
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email,
+      { redirectTo: window.location.origin },
+    );
+    setForgotLoading(false);
+    if (resetError) {
+      setForgotError(resetError.message);
+      return;
+    }
+    setForgotSent(true);
+  };
   const submit = async (e) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -609,55 +647,200 @@ function Login({ onLogin }) {
       </section>
       <section className="login-form">
         <div className="login-card">
-          <span className="eyebrow">
-            {admin ? "PORTAL PEMBIMBING" : "SELAMAT DATANG"}
+          {forgotMode ? (
+            <>
+              <span className="eyebrow">LUPA KATA SANDI</span>
+              <h2>Reset kata sandi</h2>
+              {forgotSent ? (
+                <>
+                  <p>
+                    Link reset kata sandi sudah dikirim. Periksa inbox atau
+                    folder spam email Anda, lalu ikuti tautan tersebut untuk
+                    membuat kata sandi baru.
+                  </p>
+                  <button
+                    type="button"
+                    className="primary full"
+                    onClick={() => {
+                      setForgotMode(false);
+                      setForgotSent(false);
+                    }}
+                  >
+                    Kembali ke halaman masuk
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Masukkan email akun Anda, kami akan mengirimkan tautan
+                    untuk membuat kata sandi baru.
+                  </p>
+                  <form onSubmit={submitForgot} autoComplete="off">
+                    <label>
+                      Email
+                      <input name="email" type="email" required />
+                    </label>
+                    {forgotError && <p className="error">{forgotError}</p>}
+                    <button disabled={forgotLoading} className="primary full">
+                      {forgotLoading ? "Mengirim..." : "Kirim link reset"}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => {
+                      setForgotMode(false);
+                      setForgotError("");
+                    }}
+                  >
+                    Kembali ke halaman masuk
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="eyebrow">
+                {admin ? "PORTAL PEMBIMBING" : "SELAMAT DATANG"}
+              </span>
+              <h2>Masuk ke akun Anda</h2>
+              <p>Gunakan akun terdaftar untuk melanjutkan.</p>
+              <form onSubmit={submit} autoComplete="off">
+                <label>
+                  Email atau username
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="off"
+                    required
+                  />
+                </label>
+                <label>
+                  Kata sandi
+                  <input
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+                {error && <p className="error">{error}</p>}
+                <button disabled={loading} className="primary full">
+                  {loading ? "Memverifikasi..." : "Masuk"}{" "}
+                  <ChevronLeft className="rotate" size={18} />
+                </button>
+              </form>
+              <button
+                type="button"
+                className="text-btn"
+                onClick={() => setForgotMode(true)}
+              >
+                Lupa kata sandi?
+              </button>
+              <div className="role-switch" aria-label="Pilih portal login">
+                <button
+                  type="button"
+                  className={!admin ? "active" : ""}
+                  onClick={() => setAdmin(false)}
+                >
+                  <ChevronLeft size={16} /> Anak magang
+                </button>
+                <button
+                  type="button"
+                  className={admin ? "active" : ""}
+                  onClick={() => setAdmin(true)}
+                >
+                  Admin/pembimbing <ChevronRight size={16} />
+                </button>
+              </div>
+              <small className="secure">
+                <ShieldCheck size={14} /> Koneksi aman dan terlindungi
+              </small>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+function ResetPassword({ onDone, flash }) {
+  const [saving, setSaving] = useState(false),
+    [error, setError] = useState("");
+  const submit = async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const password = form.get("password"),
+      confirm = form.get("confirm");
+    if (password !== confirm) {
+      setError("Konfirmasi kata sandi tidak sama.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const { error: updateError } = await supabase.auth.updateUser({
+      password,
+    });
+    if (updateError) {
+      setError(updateError.message);
+      setSaving(false);
+      return;
+    }
+    await supabase.auth.signOut();
+    setSaving(false);
+    flash(
+      "Kata sandi berhasil diperbarui, silakan masuk dengan kata sandi baru.",
+    );
+    onDone();
+  };
+  return (
+    <div className="login">
+      <section className="login-copy">
+        <div className="brand">
+          <span className="brand-mark">
+            <BadgeCheck />
           </span>
-          <h2>Masuk ke akun Anda</h2>
-          <p>Gunakan akun terdaftar untuk melanjutkan.</p>
+          Hadir<span>in</span>
+        </div>
+        <div>
+          <span className="eyebrow">RESET KATA SANDI</span>
+          <h1>
+            Buat kata sandi
+            <br />
+            <em>baru untuk akun Anda.</em>
+          </h1>
+        </div>
+      </section>
+      <section className="login-form">
+        <div className="login-card">
+          <span className="eyebrow">KATA SANDI BARU</span>
+          <h2>Atur ulang kata sandi</h2>
+          <p>Kata sandi minimal 6 karakter.</p>
           <form onSubmit={submit} autoComplete="off">
             <label>
-              Email atau username
+              Kata sandi baru
               <input
-                name="email"
-                type="email"
-                autoComplete="off"
+                name="password"
+                type="password"
+                minLength="6"
+                autoComplete="new-password"
                 required
               />
             </label>
             <label>
-              Kata sandi
+              Konfirmasi kata sandi
               <input
-                name="password"
+                name="confirm"
                 type="password"
+                minLength="6"
                 autoComplete="new-password"
                 required
               />
             </label>
             {error && <p className="error">{error}</p>}
-            <button disabled={loading} className="primary full">
-              {loading ? "Memverifikasi..." : "Masuk"}{" "}
-              <ChevronLeft className="rotate" size={18} />
+            <button disabled={saving} className="primary full">
+              {saving ? "Menyimpan..." : "Simpan kata sandi baru"}
             </button>
           </form>
-          <div className="role-switch" aria-label="Pilih portal login">
-            <button
-              type="button"
-              className={!admin ? "active" : ""}
-              onClick={() => setAdmin(false)}
-            >
-              <ChevronLeft size={16} /> Anak magang
-            </button>
-            <button
-              type="button"
-              className={admin ? "active" : ""}
-              onClick={() => setAdmin(true)}
-            >
-              Admin/pembimbing <ChevronRight size={16} />
-            </button>
-          </div>
-          <small className="secure">
-            <ShieldCheck size={14} /> Koneksi aman dan terlindungi
-          </small>
         </div>
       </section>
     </div>
@@ -1549,8 +1732,15 @@ function AdminDashboard({ rows, nav, loading }) {
     </>
   );
 }
-function AttendanceTable({ rows, onEdit, onDelete, onHistory, showAttendance = true }) {
-  const manageable = !!(onEdit || onDelete || onHistory);
+function AttendanceTable({
+  rows,
+  onEdit,
+  onDelete,
+  onHistory,
+  onToggleActive,
+  showAttendance = true,
+}) {
+  const manageable = !!(onEdit || onDelete || onHistory || onToggleActive);
   return (
     <table>
       <thead>
@@ -1589,6 +1779,9 @@ function AttendanceTable({ rows, onEdit, onDelete, onHistory, showAttendance = t
                   <span className="avatar small">{x.initials}</span>
                 )}
                 <b>{x.name}</b>
+                {onToggleActive && !x.is_active && (
+                  <span className="badge red">Nonaktif</span>
+                )}
               </span>
             </td>
             <td>{x.university}</td>
@@ -1628,6 +1821,14 @@ function AttendanceTable({ rows, onEdit, onDelete, onHistory, showAttendance = t
                 {onEdit && (
                   <button className="text-btn" onClick={() => onEdit(x)}>
                     Edit
+                  </button>
+                )}
+                {onToggleActive && (
+                  <button
+                    className="text-btn"
+                    onClick={() => onToggleActive(x)}
+                  >
+                    {x.is_active ? "Nonaktifkan" : "Aktifkan"}
                   </button>
                 )}
                 {onDelete && (
@@ -2056,6 +2257,35 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
     setEditing(intern);
     setOpen(true);
   };
+  const toggleActive = async (intern) => {
+    if (!supabase) {
+      const accounts = getDemoAccounts();
+      const i = accounts.findIndex((x) => x.email === intern.email);
+      if (i >= 0) accounts[i] = { ...accounts[i], is_active: !intern.is_active };
+      localStorage.setItem(demoAccountsKey, JSON.stringify(accounts));
+      flash(
+        intern.is_active
+          ? "Akun anak magang dinonaktifkan."
+          : "Akun anak magang diaktifkan kembali.",
+      );
+      refresh();
+      return;
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_active: !intern.is_active })
+      .eq("id", intern.id);
+    if (error) {
+      flash(error.message, "error");
+      return;
+    }
+    flash(
+      intern.is_active
+        ? "Akun anak magang dinonaktifkan. Riwayat absensinya tetap tersimpan."
+        : "Akun anak magang diaktifkan kembali.",
+    );
+    refresh();
+  };
   return (
     <div className="panel table-panel">
       <div className="panel-heading">
@@ -2109,6 +2339,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         onHistory={setViewingHistory}
         onEdit={edit}
         onDelete={setDeleting}
+        onToggleActive={toggleActive}
         showAttendance={false}
       />
       <TablePagination
