@@ -256,6 +256,18 @@ function App() {
         }
       })
       .finally(() => setAuthReady(true));
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          flash(
+            "Sesi Anda telah berakhir, silakan masuk kembali.",
+            "error",
+          );
+        }
+      },
+    );
+    return () => authListener.subscription.unsubscribe();
   }, []);
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -1026,8 +1038,13 @@ function Scanner({ record, onDone, onCancel }) {
           if (busy.current) return;
           busy.current = true;
           const success = await onDone(decoded, locationRef.current);
-          if (success) html5Qrcode.stop().catch(() => {});
-          else busy.current = false;
+          if (success) {
+            try {
+              if (html5Qrcode.isScanning) await html5Qrcode.stop();
+            } catch {}
+          } else {
+            busy.current = false;
+          }
         },
         () => {},
       )
@@ -1035,10 +1052,14 @@ function Scanner({ record, onDone, onCancel }) {
         setError("Tidak dapat membuka kamera belakang. Coba lagi."),
       );
     return () => {
-      html5Qrcode
-        .stop()
-        .catch(() => {})
-        .finally(() => html5Qrcode.clear());
+      (async () => {
+        try {
+          if (html5Qrcode.isScanning) await html5Qrcode.stop();
+        } catch {}
+        try {
+          html5Qrcode.clear();
+        } catch {}
+      })();
     };
   }, [userLocation, cameraReady]);
   return (
