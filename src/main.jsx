@@ -1411,7 +1411,8 @@ function Profile({ user, updateUser }) {
   const [profile, setProfile] = useState(user),
     [open, setOpen] = useState(false),
     [saving, setSaving] = useState(false),
-    [photoName, setPhotoName] = useState("");
+    [photoName, setPhotoName] = useState(""),
+    [viewingPhoto, setViewingPhoto] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -1481,11 +1482,14 @@ function Profile({ user, updateUser }) {
     <div className="profile-grid">
       <div className="panel profile-card">
         {profile.photo_url ? (
-          <img
-            className="profile-photo"
-            src={profile.photo_url}
-            alt="Foto profil"
-          />
+          <button
+            type="button"
+            className="profile-photo-button"
+            onClick={() => setViewingPhoto(true)}
+            aria-label="Lihat foto profil ukuran besar"
+          >
+            <img className="profile-photo" src={profile.photo_url} alt="" />
+          </button>
         ) : (
           <div className="avatar xl">{profile.initials}</div>
         )}
@@ -1579,6 +1583,12 @@ function Profile({ user, updateUser }) {
             </button>
           </form>
         </div>
+      )}
+      {viewingPhoto && (
+        <PhotoViewerModal
+          intern={profile}
+          onClose={() => setViewingPhoto(false)}
+        />
       )}
     </div>
   );
@@ -1774,6 +1784,7 @@ function AttendanceTable({
   onDelete,
   onHistory,
   onToggleActive,
+  onPhotoClick,
   showAttendance = true,
 }) {
   const manageable = !!(onEdit || onDelete || onHistory || onToggleActive);
@@ -1806,11 +1817,23 @@ function AttendanceTable({
             <td>
               <span className="person">
                 {x.photo_url ? (
-                  <img
-                    className="avatar small table-photo"
-                    src={x.photo_url}
-                    alt={x.name}
-                  />
+                  <button
+                    type="button"
+                    className="table-photo-button"
+                    onClick={() => onPhotoClick?.(x)}
+                    disabled={!onPhotoClick}
+                    aria-label={
+                      onPhotoClick
+                        ? `Lihat foto profil ${x.name}`
+                        : undefined
+                    }
+                  >
+                    <img
+                      className="avatar small table-photo"
+                      src={x.photo_url}
+                      alt={onPhotoClick ? "" : x.name}
+                    />
+                  </button>
                 ) : (
                   <span className="avatar small">{x.initials}</span>
                 )}
@@ -1925,6 +1948,37 @@ function DataLoadError({ message, loading, onRetry }) {
       <button className="outline" disabled={loading} onClick={onRetry}>
         {loading ? "Memuat..." : "Coba lagi"}
       </button>
+    </div>
+  );
+}
+function PhotoViewerModal({ intern, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+  return (
+    <div
+      className="modal-backdrop photo-viewer-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="photo-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Foto profil ${intern.name}`}
+      >
+        <button type="button" className="modal-close" onClick={onClose} aria-label="Tutup foto">
+          <X size={20} />
+        </button>
+        <img src={intern.photo_url} alt={`Foto profil ${intern.name}`} />
+        <p>{intern.name}</p>
+      </section>
     </div>
   );
 }
@@ -2157,6 +2211,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
     [durationFilter, setDurationFilter] = useState("Semua"),
     [currentPage, setCurrentPage] = useState(1),
     [viewingHistory, setViewingHistory] = useState(null),
+    [viewingPhoto, setViewingPhoto] = useState(null),
     [importOpen, setImportOpen] = useState(false);
   const internshipStage = (row) => {
     if (!row.internship_start && !row.internship_end) return "Tidak Diketahui";
@@ -2383,6 +2438,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         onEdit={edit}
         onDelete={setDeleting}
         onToggleActive={toggleActive}
+        onPhotoClick={setViewingPhoto}
         showAttendance={false}
       />
       <TablePagination
@@ -2483,6 +2539,12 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         <InternHistoryModal
           intern={viewingHistory}
           onClose={() => setViewingHistory(null)}
+        />
+      )}
+      {viewingPhoto && (
+        <PhotoViewerModal
+          intern={viewingPhoto}
+          onClose={() => setViewingPhoto(null)}
         />
       )}
       {importOpen && (

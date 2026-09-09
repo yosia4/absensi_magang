@@ -1733,9 +1733,68 @@ button.header-avatar-btn {
   display: block;
   border: 3px solid #e5f6ed;
 }
+.profile-photo-button {
+  display: block;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.profile-photo-button .profile-photo {
+  margin: 0;
+}
+.profile-photo-button:focus-visible {
+  outline: 3px solid #1c8a5e;
+  outline-offset: 4px;
+}
 .table-photo {
   object-fit: cover;
   border-radius: 50%;
+}
+.table-photo-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.table-photo-button:disabled {
+  cursor: default;
+}
+.table-photo-button:not(:disabled):focus-visible {
+  outline: 3px solid #1c8a5e;
+  outline-offset: 3px;
+}
+.photo-viewer-backdrop {
+  z-index: 30;
+}
+.photo-viewer {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 36px);
+  padding: 38px 18px 16px;
+  position: relative;
+  overflow: auto;
+  background: #fff;
+  border-radius: 15px;
+  box-shadow: 0 18px 45px #081a3340;
+}
+.photo-viewer img {
+  display: block;
+  width: 100%;
+  max-height: min(70vh, 620px);
+  object-fit: contain;
+  border-radius: 10px;
+  background: #f3f6f8;
+}
+.photo-viewer p {
+  margin: 12px 0 0;
+  text-align: center;
+  font-weight: 700;
+  color: #334155;
 }
 .advanced-settings label {
   display: flex;
