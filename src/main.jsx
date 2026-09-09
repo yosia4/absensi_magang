@@ -1714,7 +1714,16 @@ function AdminPage({ page, nav, flash }) {
       />
     );
   if (page === "requests")
-    return <AdminWorkflows rows={rows} refresh={load} flash={flash} />;
+    return (
+      <AdminWorkflows
+        rows={rows}
+        refresh={(selectedDate) => {
+          if (selectedDate) setAttendanceDate(selectedDate);
+          load(selectedDate || attendanceDate);
+        }}
+        flash={flash}
+      />
+    );
   if (page === "reports") return <Reports flash={flash} rows={rows} />;
   if (page === "settings") return <SettingsPage />;
   return <AdminDashboard rows={rows} nav={nav} loading={loading} />;
@@ -3011,7 +3020,7 @@ function AdminWorkflows({ rows, refresh, flash }) {
     if (error) return flash(error.message, "error");
     flash("Koreksi absensi berhasil disimpan.");
     event.currentTarget.reset();
-    refresh();
+    refresh(form.get("date"));
   };
   const nameOf = (id) =>
     rows.find((row) => row.id === id)?.name || "Anak magang";
