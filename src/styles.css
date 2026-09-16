@@ -198,23 +198,40 @@ aside {
   align-items: center;
   padding: 0 9px;
 }
-.brand > span:last-child,
-.mobile-brand span {
-  color: #28a16d;
+.brand-name {
+  display: block;
+  min-width: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
-.brand-mark {
-  width: 31px;
-  height: 31px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #1b9c67, #22c37f);
-  border-radius: 9px;
-  color: #fff;
-  margin-right: 5px;
-  box-shadow: 0 3px 8px rgba(27, 156, 103, 0.35);
+.brand-name-rawuh {
+  display: block;
+  color: #005b32;
 }
-.brand-mark svg {
-  stroke-width: 2.25;
+.brand-name-pustaka {
+  display: block;
+  color: #bd7908;
+}
+.website-logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  object-fit: contain;
+  padding: 4px;
+  border-radius: 12px;
+  background: #fff;
+}
+.brand .website-logo {
+  margin-right: 8px;
+}
+.mobile-brand .website-logo {
+  width: 48px;
+  height: 48px;
 }
 .side-label {
   font-size: 10px;
@@ -802,8 +819,37 @@ td {
 }
 .profile-grid {
   display: grid;
-  grid-template-columns: 310px 1fr;
+  grid-template-columns: 310px minmax(0, 1fr);
   gap: 19px;
+}
+.profile-grid > .panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-grid .panel-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.profile-grid .info-row {
+  gap: 12px;
+}
+.profile-grid .info-row b {
+  min-width: 0;
+  text-align: right;
+}
+.profile-edit-modal label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-edit-modal input {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+@media (min-width: 801px) and (max-width: 1100px) {
+  .profile-grid {
+    grid-template-columns: 270px minmax(0, 1fr);
+  }
 }
 .profile-card {
   text-align: center;
@@ -942,12 +988,14 @@ td {
   justify-content: space-between;
 }
 .login-copy .brand {
-  color: #fff;
-  padding: 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: #fff;
 }
-.login-copy .brand-mark {
-  background: #ffffff1c;
-  color: #a6ecd0;
+.login-copy .brand-name {
+  font-size: 27px;
 }
 .login-copy h1 {
   font: 600 42px "Playfair Display";
@@ -1135,7 +1183,7 @@ td {
   }
   .split,
   .profile-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .stat-grid {
     grid-template-columns: 1fr 1fr;
@@ -1305,9 +1353,6 @@ td {
   .status-grid {
     grid-template-columns: 1.4fr 1fr 1fr;
   }
-  .profile-grid {
-    grid-template-columns: 270px 1fr;
-  }
   .login-copy {
     padding: 42px;
   }
@@ -1469,10 +1514,9 @@ td {
   font-size: 27px;
   letter-spacing: -0.6px;
 }
-.login-copy .brand-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+.login-copy .website-logo {
+  width: 88px;
+  height: 88px;
 }
 .login-copy .eyebrow {
   margin-bottom: 15px;
@@ -1592,6 +1636,7 @@ td {
   }
   .login-copy .brand {
     font-size: 25px;
+    margin-inline: auto;
   }
   .login-form {
     display: block;
@@ -1680,10 +1725,50 @@ td {
   font-weight: 600;
 }
 .account-settings input {
+  min-width: 0;
+  width: 100%;
   border: 1px solid #dce4eb;
   border-radius: 8px;
   padding: 11px;
   background: #fff;
+}
+.password-field {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.password-field input.password-input {
+  width: 100%;
+  padding-right: 48px;
+}
+/* Gunakan tombol mata aplikasi saja, tanpa tombol bawaan Microsoft Edge. */
+.password-field input.password-input::-ms-reveal {
+  display: none;
+}
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  bottom: 0;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #66758a;
+}
+.password-toggle:hover {
+  color: #188258;
+}
+.password-toggle:focus-visible {
+  outline: 2px solid #1c8a5e;
+  outline-offset: -4px;
+}
+.password-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 .account-settings label small {
   font-weight: 400;

@@ -6,9 +6,11 @@ import { QRCodeSVG } from "qrcode.react";
 import { exportAttendanceExcel, exportAttendancePdf } from "./reportExport";
 import ConfirmDialog from "./components/ConfirmDialog";
 import NotificationPanel from "./components/NotificationPanel";
+import PasswordInput from "./components/PasswordInput";
+import WebsiteLogo, { websiteLogoSrc } from "./components/WebsiteLogo";
+import BrandName from "./components/BrandName";
 import {
   AlertCircle,
-  BadgeCheck,
   Bell,
   CalendarDays,
   Camera,
@@ -341,7 +343,7 @@ function App() {
   if (!authReady)
     return (
       <div className="auth-loading">
-        <BadgeCheck size={28} />
+        <WebsiteLogo />
         <b>Memeriksa sesi login...</b>
       </div>
     );
@@ -407,12 +409,8 @@ function App() {
     <div className="app-shell">
       <aside>
         <div className="brand">
-          <span className="brand-mark">
-            <BadgeCheck />
-          </span>
-          <span>
-            Hadir<span>in</span>
-          </span>
+          <WebsiteLogo />
+          <BrandName />
         </div>
         <p className="side-label">MENU UTAMA</p>
         {nav.map(([id, label, Icon]) => (
@@ -430,13 +428,13 @@ function App() {
             <LogOut size={19} />
             Keluar
           </button>
-          <small>© 2026 Hadirin</small>
+          <small>© 2026 Rawuh Pustaka</small>
         </div>
       </aside>
       <main>
         <header>
           <div className="mobile-brand">
-            Hadir<span>in</span>
+            <WebsiteLogo />
           </div>
           <div>
             <p className="crumb">
@@ -637,10 +635,8 @@ function Login({ onLogin }) {
     <div className="login">
       <section className="login-copy">
         <div className="brand">
-          <span className="brand-mark">
-            <BadgeCheck />
-          </span>
-          Hadir<span>in</span>
+          <WebsiteLogo />
+          <BrandName />
         </div>
         <div>
           <span className="eyebrow">SISTEM ABSENSI MAGANG</span>
@@ -730,9 +726,8 @@ function Login({ onLogin }) {
                 </label>
                 <label>
                   Kata sandi
-                  <input
+                  <PasswordInput
                     name="password"
-                    type="password"
                     autoComplete="new-password"
                     required
                   />
@@ -809,10 +804,8 @@ function ResetPassword({ onDone, flash }) {
     <div className="login">
       <section className="login-copy">
         <div className="brand">
-          <span className="brand-mark">
-            <BadgeCheck />
-          </span>
-          Hadir<span>in</span>
+          <WebsiteLogo />
+          <BrandName />
         </div>
         <div>
           <span className="eyebrow">RESET KATA SANDI</span>
@@ -831,9 +824,8 @@ function ResetPassword({ onDone, flash }) {
           <form onSubmit={submit} autoComplete="off">
             <label>
               Kata sandi baru
-              <input
+              <PasswordInput
                 name="password"
-                type="password"
                 minLength="6"
                 autoComplete="new-password"
                 required
@@ -841,9 +833,8 @@ function ResetPassword({ onDone, flash }) {
             </label>
             <label>
               Konfirmasi kata sandi
-              <input
+              <PasswordInput
                 name="confirm"
-                type="password"
                 minLength="6"
                 autoComplete="new-password"
                 required
@@ -1541,7 +1532,7 @@ function Profile({ user, updateUser }) {
       </div>
       {open && (
         <div className="modal-backdrop">
-          <form className="modal" onSubmit={submit}>
+          <form className="modal profile-edit-modal" onSubmit={submit}>
             <button
               type="button"
               className="modal-close"
@@ -1576,7 +1567,7 @@ function Profile({ user, updateUser }) {
             </label>
             <label>
               Kata sandi baru <small>(kosongkan jika tidak diubah)</small>
-              <input type="password" name="password" minLength="6" />
+              <PasswordInput name="password" minLength="6" />
             </label>
             <button disabled={saving} className="primary full">
               {saving ? "Menyimpan..." : "Simpan perubahan"}
@@ -2085,7 +2076,7 @@ function QrGenerator({ flash }) {
               level="H"
               includeMargin
               imageSettings={{
-                src: "/logo-balaitemu.png",
+                src: websiteLogoSrc,
                 height: 42,
                 width: 42,
                 excavate: true,
@@ -2476,7 +2467,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
             {!editing && (
               <label>
                 Kata sandi awal
-                <input type="password" name="password" minLength="6" required />
+                <PasswordInput name="password" minLength="6" required />
               </label>
             )}
             <label>
@@ -3598,7 +3589,7 @@ function AccountSettings() {
       </label>
       <label>
         Kata sandi baru <small>(kosongkan jika tidak diubah)</small>
-        <input name="password" type="password" minLength="6" />
+        <PasswordInput name="password" minLength="6" />
       </label>
       <button className="primary" disabled={saving}>
         {saving ? "Menyimpan..." : "Simpan profil"}
