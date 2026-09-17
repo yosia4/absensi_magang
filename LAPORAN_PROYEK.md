@@ -1,8 +1,8 @@
-# Laporan Proyek Web Absensi Magang “Hadirin”
+# Laporan Proyek Web Absensi Magang “Rawuh Pustaka”
 
 ## 1. Gambaran Umum
 
-**Hadirin** adalah aplikasi web absensi untuk anak magang. Aplikasi menyediakan dua peran pengguna: **admin/pembimbing** dan **anak magang**. Admin dapat mengelola data akun magang, membuat QR absensi, memantau kehadiran, serta melihat laporan. Anak magang dapat masuk menggunakan akun yang dibuat admin, melakukan scan QR, melihat riwayat absensi, dan mengubah profilnya.
+**Rawuh Pustaka** adalah aplikasi web absensi untuk anak magang. Aplikasi menyediakan dua peran pengguna: **admin/pembimbing** dan **anak magang**. Admin dapat mengelola data akun magang, membuat QR absensi, memantau kehadiran, serta melihat laporan. Anak magang dapat masuk menggunakan akun yang dibuat admin, melakukan scan QR, melihat riwayat absensi, dan mengubah profilnya.
 
 Sistem dirancang dengan integrasi **Supabase** sehingga data pengguna, absensi, QR, dan pembaruan data dapat disimpan secara terpusat serta ditampilkan secara real-time.
 
@@ -127,4 +127,4 @@ Antarmuka dibuat responsif untuk desktop, Android, iPhone, iPad, dan tablet. Nav
 
 ## 9. Kesimpulan
 
-Hadirin merupakan aplikasi absensi magang berbasis web modern yang memakai React sebagai frontend dan Supabase sebagai backend. Kombinasi autentikasi, database PostgreSQL, real-time, QR Code, kamera, serta validasi GPS membuat proses absensi lebih terstruktur, aman, dan mudah dipantau oleh pembimbing.
+Rawuh Pustaka merupakan aplikasi absensi magang berbasis web modern yang memakai React sebagai frontend dan Supabase sebagai backend. Kombinasi autentikasi, database PostgreSQL, real-time, QR Code, kamera, serta validasi GPS membuat proses absensi lebih terstruktur, aman, dan mudah dipantau oleh pembimbing.

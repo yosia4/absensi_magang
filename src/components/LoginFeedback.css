@@ -1,0 +1,336 @@
+.login-feedback {
+  --feedback-accent: #16704d;
+  width: min(380px, calc(100vw - 36px));
+  max-height: calc(100dvh - 36px);
+  margin: auto;
+  padding: 26px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #243a32;
+  text-align: center;
+  box-shadow: none;
+  overflow: auto;
+}
+.login-feedback[open] {
+  animation: login-feedback-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.login-feedback-success[open] {
+  animation: login-feedback-exit 260ms 1940ms ease-in forwards;
+}
+.login-feedback::backdrop {
+  background: #f6f8fbcc;
+  backdrop-filter: blur(6px);
+}
+.login-feedback-error {
+  --feedback-accent: #b84436;
+}
+.login-feedback-art {
+  position: relative;
+  width: min(240px, 100%);
+  margin: 0 auto 20px;
+  isolation: isolate;
+}
+.animated-login-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.animated-login-logo g {
+  transform-box: view-box;
+}
+.animated-login-book-left {
+  --book-angle: 3deg;
+  transform-origin: 627px 880px;
+}
+.animated-login-book-right {
+  --book-angle: -3deg;
+  transform-origin: 627px 880px;
+}
+.animated-login-leaf-left {
+  --leaf-angle: 1.5deg;
+  transform-origin: 479px 748px;
+}
+.animated-login-leaf-right {
+  --leaf-angle: -1.5deg;
+  transform-origin: 775px 748px;
+}
+.animated-login-logo-loading .animated-login-book-left {
+  animation: login-book-breathe 2600ms ease-in-out infinite;
+}
+.animated-login-logo-loading .animated-login-book-right {
+  animation: login-book-breathe 2600ms 120ms ease-in-out infinite;
+}
+.animated-login-logo-loading .animated-login-leaf-left {
+  animation: login-leaf-sway 3200ms ease-in-out infinite;
+}
+.animated-login-logo-loading .animated-login-leaf-right {
+  animation: login-leaf-sway 3200ms 180ms ease-in-out infinite;
+}
+.animated-login-logo-success .animated-login-book-left {
+  animation: login-book-open 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animated-login-logo-success .animated-login-book-right {
+  animation: login-book-open 1100ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animated-login-logo-success .animated-login-leaf-left {
+  animation: login-leaf-unfold 1300ms 100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animated-login-logo-success .animated-login-leaf-right {
+  animation: login-leaf-unfold 1300ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animated-login-page-light path {
+  stroke-dasharray: 1;
+  animation: login-page-light 1100ms 480ms ease-out both;
+}
+.animated-login-sparkle path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: login-sparkle 900ms var(--spark-delay) ease-out both;
+}
+.animated-login-logo-error .animated-login-book-left,
+.animated-login-logo-error .animated-login-book-right {
+  animation: login-book-error 480ms ease-out both;
+}
+.login-feedback-symbol {
+  position: absolute;
+  right: -2px;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--feedback-accent);
+  color: #fff;
+  animation: login-symbol-arrive 550ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.login-feedback-success .login-feedback-symbol svg path {
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: login-check-draw 420ms 400ms ease-out forwards;
+}
+.login-feedback-copy h2 {
+  margin: 0;
+  font-size: clamp(21px, 5.5vw, 25px);
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+  animation: login-copy-reveal 450ms 80ms ease-out both;
+}
+.login-feedback-copy p {
+  margin: 12px 0 22px;
+  color: #697972;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  animation: login-copy-reveal 450ms 160ms ease-out both;
+}
+.login-feedback-copy strong {
+  display: block;
+  color: var(--feedback-accent);
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+.login-feedback-copy span {
+  display: block;
+}
+.login-feedback-error .login-feedback-copy p {
+  color: #944e42;
+}
+.login-feedback-action {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--feedback-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+.login-feedback-action:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.login-feedback-action:active {
+  transform: translateY(0) scale(0.98);
+}
+.login-feedback-action:focus-visible {
+  outline: 3px solid var(--feedback-accent);
+  outline-offset: 4px;
+}
+.login-feedback-progress {
+  width: 100px;
+  height: 4px;
+  margin: 26px auto 12px;
+  overflow: hidden;
+  background: #e2ece6;
+  border-radius: 4px;
+}
+.login-feedback-progress span {
+  display: block;
+  width: 50%;
+  height: 100%;
+  background: #298359;
+  border-radius: inherit;
+  animation: login-feedback-progress 1600ms ease-in-out infinite alternate;
+}
+@keyframes login-book-breathe {
+  0%,
+  100% {
+    transform: rotate(0) scaleX(1);
+  }
+  45% {
+    transform: rotate(var(--book-angle)) scaleX(0.94);
+  }
+}
+@keyframes login-leaf-sway {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(var(--leaf-angle));
+  }
+}
+@keyframes login-book-open {
+  0% {
+    transform: rotate(var(--book-angle)) scaleX(0.88);
+  }
+  70% {
+    transform: rotate(0) scaleX(1.015);
+  }
+  100% {
+    transform: rotate(0) scaleX(1);
+  }
+}
+@keyframes login-leaf-unfold {
+  0% {
+    transform: rotate(var(--leaf-angle)) scale(0.96);
+  }
+  75% {
+    transform: rotate(0) scale(1.008);
+  }
+  100% {
+    transform: rotate(0) scale(1);
+  }
+}
+@keyframes login-page-light {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.8;
+  }
+  75% {
+    stroke-dashoffset: 0;
+    opacity: 0.6;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes login-sparkle {
+  0% {
+    transform: scale(0.3) rotate(-20deg);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1) rotate(0);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(0.5) rotate(20deg);
+    opacity: 0;
+  }
+}
+@keyframes login-symbol-arrive {
+  0% {
+    transform: translateY(7px) scale(0.7);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(0) scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes login-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes login-copy-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes login-feedback-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes login-book-error {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-7px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+@keyframes login-feedback-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes login-feedback-progress {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(150%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-feedback[open],
+  .login-feedback *,
+  .login-feedback *::before,
+  .login-feedback *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .login-feedback-success .login-feedback-symbol svg path {
+    stroke-dashoffset: 0;
+  }
+  .animated-login-page-light,
+  .animated-login-sparkle {
+    display: none;
+  }
+}

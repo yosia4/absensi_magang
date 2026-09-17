@@ -11,6 +11,8 @@ import WebsiteLogo, { websiteLogoSrc } from "./components/WebsiteLogo";
 import BrandName from "./components/BrandName";
 import LeaveRequestReminder from "./components/LeaveRequestReminder";
 import AttendanceSuccess from "./components/AttendanceSuccess";
+import LoginFeedback from "./components/LoginFeedback";
+import { loginErrorMessage } from "./loginErrorMessage";
 import {
   AlertCircle,
   Bell,
@@ -531,6 +533,18 @@ function Login({ onLogin }) {
     [forgotSent, setForgotSent] = useState(false),
     [forgotLoading, setForgotLoading] = useState(false),
     [forgotError, setForgotError] = useState("");
+  const [loginFeedback, setLoginFeedback] = useState(null);
+  const loginBusy = useRef(false);
+  const pendingProfile = useRef(null);
+  const continueLogin = () => {
+    if (pendingProfile.current) {
+      const profile = pendingProfile.current;
+      pendingProfile.current = null;
+      onLogin(profile);
+    } else {
+      setLoginFeedback(null);
+    }
+  };
   const submitForgot = async (e) => {
     e.preventDefault();
     if (!supabase) {
@@ -553,85 +567,85 @@ function Login({ onLogin }) {
   };
   const submit = async (e) => {
     e.preventDefault();
+    if (loginBusy.current || pendingProfile.current) return;
     const form = new FormData(e.currentTarget);
-    if (!supabase) {
-      if (!demoEnabled) {
-        setError(
-          "Konfigurasi Supabase belum tersedia. Mode demo dinonaktifkan pada produksi.",
-        );
-        return;
-      }
-      const email = String(form.get("email")).trim().toLowerCase(),
-        password = String(form.get("password"));
-      const account = getDemoAccounts().find(
-        (x) => x.email.toLowerCase() === email && x.password === password,
-      );
-      if (account) {
-        if (
-          (admin && account.role !== "admin") ||
-          (!admin && account.role !== "intern")
-        ) {
-          setError("Role akun tidak sesuai portal yang dipilih.");
-          return;
-        }
-        onLogin({
-          ...account,
-          initials: account.name
-            .split(" ")
-            .map((x) => x[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase(),
-        });
-        return;
-      }
-      setError("Email atau kata sandi belum terdaftar.");
-      return;
-    }
+    const email = String(form.get("email")).trim().toLowerCase();
+    const password = String(form.get("password"));
+    loginBusy.current = true;
     setLoading(true);
     setError("");
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: form.get("email"),
-      password: form.get("password"),
-    });
-    if (authError) {
-      setError(authError.message);
+    setLoginFeedback({ phase: "loading" });
+    try {
+      let profile;
+      if (!supabase) {
+        if (!demoEnabled) {
+          throw new Error(
+            "Konfigurasi Supabase belum tersedia. Mode demo dinonaktifkan pada produksi.",
+          );
+        }
+        profile = getDemoAccounts().find(
+          (account) =>
+            account.email.toLowerCase() === email && account.password === password,
+        );
+        if (!profile) {
+          throw new Error(
+            "Email atau kata sandi tidak sesuai. Periksa kembali dan coba lagi.",
+          );
+        }
+      } else {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (authError) throw authError;
+        const { data: foundProfile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single();
+        if (profileError || !foundProfile?.is_active) {
+          await supabase.auth.signOut();
+          if (profileError) throw profileError;
+          throw new Error(
+            "Profil tidak aktif atau belum tersedia. Hubungi pembimbing Anda.",
+          );
+        }
+        profile = foundProfile;
+      }
+      if (
+        (admin && profile.role !== "admin") ||
+        (!admin && profile.role !== "intern")
+      ) {
+        if (supabase) await supabase.auth.signOut();
+        throw new Error(
+          "Akun tidak sesuai portal yang dipilih. Pilih Anak magang atau Admin/pembimbing sesuai akun Anda.",
+        );
+      }
+      const photoPath = getPhotoPath(profile.photo_url || "");
+      pendingProfile.current = {
+        ...profile,
+        ...(supabase
+          ? {
+              photo_path: photoPath,
+              photo_url: await getSignedPhotoUrl(photoPath),
+            }
+          : {}),
+        initials: profile.name
+          .split(" ")
+          .map((part) => part[0])
+          .slice(0, 2)
+          .join("")
+          .toUpperCase(),
+      };
+      setLoginFeedback({ phase: "success", name: profile.name });
+    } catch (loginError) {
+      const message = loginErrorMessage(loginError);
+      setError(message);
+      setLoginFeedback({ phase: "error", message });
+    } finally {
+      loginBusy.current = false;
       setLoading(false);
-      return;
     }
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", data.user.id)
-      .single();
-    if (profileError || !profile?.is_active) {
-      await supabase.auth.signOut();
-      setError("Profil tidak aktif atau belum tersedia.");
-      setLoading(false);
-      return;
-    }
-    if (
-      (admin && profile.role !== "admin") ||
-      (!admin && profile.role !== "intern")
-    ) {
-      await supabase.auth.signOut();
-      setError("Role akun tidak sesuai portal yang dipilih.");
-      setLoading(false);
-      return;
-    }
-    const photoPath = getPhotoPath(profile.photo_url || "");
-    onLogin({
-      ...profile,
-      photo_path: photoPath,
-      photo_url: await getSignedPhotoUrl(photoPath),
-      initials: profile.name
-        .split(" ")
-        .map((x) => x[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase(),
-    });
-    setLoading(false);
   };
   return (
     <div className="login">
@@ -658,6 +672,10 @@ function Login({ onLogin }) {
       </section>
       <section className="login-form">
         <div className="login-card">
+          <div className="brand login-card-brand">
+            <WebsiteLogo />
+            <BrandName />
+          </div>
           {forgotMode ? (
             <>
               <span className="eyebrow">LUPA KATA SANDI</span>
@@ -734,7 +752,7 @@ function Login({ onLogin }) {
                     required
                   />
                 </label>
-                {error && <p className="error">{error}</p>}
+                {error && <p className="error" role="alert">{error}</p>}
                 <button disabled={loading} className="primary full">
                   {loading ? "Memverifikasi..." : "Masuk"}{" "}
                   <ChevronLeft className="rotate" size={18} />
@@ -778,6 +796,9 @@ function Login({ onLogin }) {
           <small>Sistem absensi magang &middot; Rawuh Pustaka</small>
         </section>
       </section>
+      {loginFeedback && (
+        <LoginFeedback {...loginFeedback} onContinue={continueLogin} />
+      )}
     </div>
   );
 }
@@ -828,6 +849,10 @@ function ResetPassword({ onDone, flash }) {
       </section>
       <section className="login-form">
         <div className="login-card">
+          <div className="brand login-card-brand">
+            <WebsiteLogo />
+            <BrandName />
+          </div>
           <span className="eyebrow">KATA SANDI BARU</span>
           <h2>Atur ulang kata sandi</h2>
           <p>Kata sandi minimal 6 karakter.</p>

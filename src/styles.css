@@ -1470,6 +1470,7 @@ td {
   }
 }
 /* Tampilan halaman login */
+.login-card-brand,
 .login-mobile-note {
   display: none;
 }
@@ -1683,14 +1684,23 @@ td {
   }
 }
 @media (max-width: 700px) {
-  .login-copy {
-    min-height: 150px;
-    padding: calc(20px + env(safe-area-inset-top)) 0 24px;
+  .login {
+    display: block;
   }
-  .login-copy .brand {
-    width: 100%;
+  .login-copy {
+    display: none;
+  }
+  .login-card .login-card-brand {
+    display: flex;
     justify-content: center;
-    border-radius: 24px;
+    padding: 0 0 28px;
+  }
+  .login-card-brand .website-logo {
+    width: clamp(64px, 22vw, 88px);
+    height: clamp(64px, 22vw, 88px);
+  }
+  .login-card-brand .brand-name {
+    font-size: clamp(22px, 6.5vw, 27px);
   }
   .login-mobile-note {
     display: flex;
@@ -1726,10 +1736,12 @@ td {
     display: none;
   }
   .login-form {
-    padding: 0 18px calc(28px + env(safe-area-inset-bottom));
+    padding: calc(20px + env(safe-area-inset-top)) 18px
+      calc(28px + env(safe-area-inset-bottom));
   }
   .login-card {
-    margin-top: -25px;
+    margin-top: 0;
+    background: #fff;
   }
 }
 .settings-note {
