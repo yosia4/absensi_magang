@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
@@ -9,6 +9,8 @@ import NotificationPanel from "./components/NotificationPanel";
 import PasswordInput from "./components/PasswordInput";
 import WebsiteLogo, { websiteLogoSrc } from "./components/WebsiteLogo";
 import BrandName from "./components/BrandName";
+import LeaveRequestReminder from "./components/LeaveRequestReminder";
+import AttendanceSuccess from "./components/AttendanceSuccess";
 import {
   AlertCircle,
   Bell,
@@ -767,6 +769,14 @@ function Login({ onLogin }) {
             </>
           )}
         </div>
+        <section className="login-mobile-note" aria-label="Semangat magang">
+          <p>
+            Hadir tepat waktu,
+            <br />
+            <strong>bertumbuh setiap hari.</strong>
+          </p>
+          <small>Sistem absensi magang &middot; Rawuh Pustaka</small>
+        </section>
       </section>
     </div>
   );
@@ -860,6 +870,8 @@ function InternPage({
   updateUser,
 }) {
   const record = attendance.find((x) => x.date === today);
+  const [scanSuccess, setScanSuccess] = useState(null);
+  const closeScanSuccess = useCallback(() => setScanSuccess(null), []);
   useEffect(() => {
     if (!supabase || !user.id) return;
     const load = async () => {
@@ -946,9 +958,10 @@ function InternPage({
         },
         ...a.filter((x) => x.date !== data.date),
       ]);
-      flash(
-        data.check_out ? "Check-out berhasil dicatat!" : "Absensi berhasil!",
-      );
+      setScanSuccess({
+        checkout: Boolean(data.check_out),
+        time: formatTime(data.check_out || data.check_in),
+      });
       nav("dashboard");
       return true;
     }
@@ -963,33 +976,46 @@ function InternPage({
             ...a,
           ],
     );
-    flash(
-      record
-        ? "Check-out berhasil dicatat!"
-        : "Absensi berhasil! Jam masuk: " + now,
-    );
+    setScanSuccess({ checkout: Boolean(record), time: now });
     nav("dashboard");
     return true;
   };
-  if (page === "scan")
-    return (
+  let content;
+  if (page === "scan") {
+    content = (
       <Scanner
         record={record}
         onDone={processScan}
         onCancel={() => nav("dashboard")}
       />
     );
-  if (page === "history") return <History data={attendance} />;
-  if (page === "leave") return <LeaveRequests user={user} flash={flash} />;
-  if (page === "profile")
-    return <Profile user={user} updateUser={updateUser} />;
+  } else if (page === "history") {
+    content = <History data={attendance} />;
+  } else if (page === "leave") {
+    content = <LeaveRequests user={user} flash={flash} />;
+  } else if (page === "profile") {
+    content = <Profile user={user} updateUser={updateUser} />;
+  } else {
+    content = (
+      <InternDashboard
+        user={user}
+        record={record}
+        nav={nav}
+        attendance={attendance}
+      />
+    );
+  }
   return (
-    <InternDashboard
-      user={user}
-      record={record}
-      nav={nav}
-      attendance={attendance}
-    />
+    <>
+      {content}
+      {scanSuccess && (
+        <AttendanceSuccess
+          {...scanSuccess}
+          name={user.name}
+          onClose={closeScanSuccess}
+        />
+      )}
+    </>
   );
 }
 function InternDashboard({ user, record, nav, attendance }) {
@@ -2886,7 +2912,8 @@ function LeaveRequests({ user, flash }) {
     event.preventDefault();
     if (!supabase)
       return flash("Fitur pengajuan memerlukan Supabase.", "error");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const requestType = form.get("type");
     const dateFrom = form.get("date_from");
     setSaving(true);
@@ -2899,7 +2926,7 @@ function LeaveRequests({ user, flash }) {
     });
     setSaving(false);
     if (error) return flash(error.message, "error");
-    event.currentTarget.reset();
+    formElement.reset();
     setType("Izin");
     flash("Pengajuan berhasil dikirim.");
     load();
@@ -2995,7 +3022,7 @@ function LeaveRequests({ user, flash }) {
         {historyRequests.length ? (
           historyRequests.map((item) => (
             <div className="workflow-item" key={item.id}>
-              <div>
+              <div className="leave-request-details">
                 <b>{item.type}</b>
                 <p>
                   {item.date_from === item.date_to
@@ -3006,6 +3033,7 @@ function LeaveRequests({ user, flash }) {
                 {item.status === "Ditolak" && item.rejection_reason && (
                   <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>
                 )}
+                <LeaveRequestReminder request={item} />
               </div>
               <span
                 className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}

@@ -1470,6 +1470,9 @@ td {
   }
 }
 /* Tampilan halaman login */
+.login-mobile-note {
+  display: none;
+}
 .login {
   background: #f4f7fb;
 }
@@ -1682,7 +1685,42 @@ td {
 @media (max-width: 700px) {
   .login-copy {
     min-height: 150px;
-    padding: calc(20px + env(safe-area-inset-top)) 24px 24px;
+    padding: calc(20px + env(safe-area-inset-top)) 0 24px;
+  }
+  .login-copy .brand {
+    width: 100%;
+    justify-content: center;
+    border-radius: 24px;
+  }
+  .login-mobile-note {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    max-width: 320px;
+    margin: 36px auto 0;
+    padding: 8px 4px 16px;
+    text-align: center;
+  }
+  .login-mobile-note p {
+    margin: 0;
+    color: #405269;
+    font-size: clamp(20px, 5vw, 24px);
+    font-weight: 500;
+    letter-spacing: -0.6px;
+    line-height: 1.4;
+    text-wrap: balance;
+  }
+  .login-mobile-note strong {
+    color: #178460;
+    font-weight: 600;
+  }
+  .login-mobile-note small {
+    color: #65768b;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    line-height: 1.5;
   }
   .login-copy > div:not(.brand) {
     display: none;
@@ -2051,6 +2089,34 @@ button.header-avatar-btn {
 .workflow-actions {
   display: flex;
   gap: 8px;
+}
+.leave-request-details {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.leave-request-reminder {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #f0d9a0;
+  border-radius: 12px;
+  background: #fff9ec;
+}
+.leave-request-reminder-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #8a5b12;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.leave-request-reminder-heading svg {
+  flex-shrink: 0;
+}
+.leave-request-reminder p {
+  margin: 8px 0 12px;
+  color: #75613c;
+  line-height: 1.6;
 }
 .audit-item {
   display: flex;
