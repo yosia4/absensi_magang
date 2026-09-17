@@ -55,19 +55,25 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 - Membuat QR Code absensi berdasarkan lokasi meja absensi.
 - Memantau status hadir, terlambat, check-in, dan check-out.
 - Melihat ringkasan laporan kehadiran.
+- Rekap layar, Excel, dan PDF memisahkan Hadir, Terlambat, Izin, Sakit, Alpa, serta **Tanpa catatan**. Tanpa catatan dihitung pada Senin–Jumat dalam periode magang hingga hari ini; Sabtu opsional dan Minggu libur. Alpa hanya dihitung dari status yang tersimpan. Tanggal libur khusus belum diperhitungkan. Periode magang yang belum lengkap ditandai **—** agar tidak menghasilkan perkiraan ketidakhadiran.
+- Melihat grafik tren kehadiran mingguan atau bulanan di dashboard. Pilih batang/tanggal untuk melihat jumlah Hadir, Terlambat, Izin, Sakit, dan Alpa pada hari tersebut.
 
 ### Anak Magang
 
 - Login menggunakan email dan kata sandi yang dibuat admin.
 - Dashboard dengan data absensi aktual, tanpa data contoh.
+- Dashboard membedakan Izin, Sakit, Alpa, belum absen, sudah check-in, dan absensi selesai. Check-out hanya ditawarkan jika ada jam masuk. Status Izin/Sakit/Alpa serta catatan tanpa jam masuk yang perlu ditinjau tidak membuka scanner dari antarmuka peserta.
 - Scan QR melalui kamera perangkat.
 - Validasi izin kamera dan lokasi GPS sebelum QR diproses.
 - Validasi radius lokasi absensi (geofencing).
 - Check-in dan check-out pada QR yang sama.
 - Melihat riwayat absensi aktual.
+- Melihat kalender kehadiran berwarna pada halaman Riwayat, berpindah bulan, dan memilih tanggal untuk melihat status serta jam masuk/pulang.
 - Melihat dan mengubah profil, email, serta kata sandi.
 
 ## 5. Struktur Data Utama
+
+Kalender dan grafik membaca tabel `attendance` yang sudah ada dan mengikuti hak akses pengguna; tidak memerlukan migrasi database baru. Data diperbarui melalui Supabase Realtime. Kalender memakai warna status yang kontras. Minggu ditandai **Libur** dengan warna khusus, sedangkan Sabtu tanpa catatan ditandai **Masuk opsional**. Senin?Jumat yang sudah lewat atau hari ini tanpa catatan dalam masa magang ditandai **Belum Absen**, bukan otomatis **Alpa**. Catatan absensi yang sudah tersimpan pada akhir pekan tetap dapat dilihat. Grafik menghitung catatan harian per status, dengan Hadir dan Terlambat terpisah, dan tidak menghitung tanggal mendatang. Tampilan mingguan menggunakan Senin–Minggu, sedangkan tampilan bulanan menampilkan setiap tanggal dalam bulan yang dipilih. Tanggal dan waktu absensi mengikuti WIB.
 
 ### `profiles`
 
@@ -90,6 +96,12 @@ Menyimpan token QR, status aktif, masa berlaku, koordinat lokasi, dan radius abs
 - Scan absensi diproses melalui fungsi SQL sehingga waktu, QR aktif, serta jarak lokasi dapat diverifikasi oleh server.
 
 ## 7. Responsivitas
+
+Skeleton loading ditampilkan pada kartu ringkasan, daftar peserta/riwayat, laporan, dan grafik saat data dimuat. Animasi mengikuti preferensi perangkat untuk mengurangi gerakan. Laporan yang gagal dimuat menyediakan tombol coba lagi; ekspor dinonaktifkan hingga data periode yang dipilih berhasil dimuat.
+
+Warna status Hadir, Terlambat, Izin, Sakit, dan Alpa memakai palet yang sama pada kalender, grafik, dan badge absensi. Pada kalender, hari ini ditandai lingkaran pada angka tanggal, sedangkan tanggal yang dipilih ditandai garis tepi kotak.
+
+Pada layar HP hingga 640 piksel, tabel absensi dan daftar peserta ditampilkan sebagai kartu ringkas. Kartu absensi menampilkan nama, status, serta jam masuk/pulang. Bagian **Lihat detail** memuat informasi tambahan dan aksi pengelolaan yang tersedia. Tampilan desktop tetap menggunakan tabel. Pola ini juga diterapkan pada riwayat peserta dan riwayat yang dibuka admin.
 
 Antarmuka dibuat responsif untuk desktop, Android, iPhone, iPad, dan tablet. Navigasi samping berubah menjadi navigasi bawah pada layar kecil. Modal, tabel, tombol, scanner kamera, dan area aman perangkat juga disesuaikan dengan ukuran layar.
 

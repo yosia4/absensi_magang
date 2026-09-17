@@ -1,0 +1,50 @@
+/* One palette for calendar cells, charts, and attendance badges. */
+.tone-present {
+  --status-color: #15803d;
+  --status-bg: #15803d;
+  --status-text: #fff;
+}
+.tone-late {
+  --status-color: #facc15;
+  --status-bg: #facc15;
+  --status-text: #422006;
+}
+.tone-leave {
+  --status-color: #1d4ed8;
+  --status-bg: #1d4ed8;
+  --status-text: #fff;
+}
+.tone-sick {
+  --status-color: #7e22ce;
+  --status-bg: #7e22ce;
+  --status-text: #fff;
+}
+.tone-absent {
+  --status-color: #b91c1c;
+  --status-bg: #b91c1c;
+  --status-text: #fff;
+}
+.tone-missing {
+  --status-color: #8a98a9;
+  --status-bg: #f0f3f6;
+  --status-text: #566579;
+}
+.tone-neutral {
+  --status-color: #cbd3db;
+  --status-bg: #fafbfc;
+  --status-text: #64748b;
+}
+.tone-holiday {
+  --status-color: #334155;
+  --status-bg: #334155;
+  --status-text: #fff;
+}
+.tone-optional {
+  --status-color: #0891b2;
+  --status-bg: #a5f3fc;
+  --status-text: #164e63;
+}
+.badge.attendance-status {
+  color: var(--status-text);
+  background: var(--status-bg);
+}

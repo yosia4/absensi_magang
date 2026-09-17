@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeSVG } from "qrcode.react";
-import { exportAttendanceExcel, exportAttendancePdf } from "./reportExport";
+import InternDashboard from "./components/InternDashboard";
+import AttendanceReports from "./components/AttendanceReports";
+import Skeleton from "./components/Skeleton";
+import { attendanceDisplayState, fetchAllPages } from "./attendanceSummary";
 import ConfirmDialog from "./components/ConfirmDialog";
 import NotificationPanel from "./components/NotificationPanel";
 import PasswordInput from "./components/PasswordInput";
@@ -12,6 +15,11 @@ import BrandName from "./components/BrandName";
 import LeaveRequestReminder from "./components/LeaveRequestReminder";
 import AttendanceSuccess from "./components/AttendanceSuccess";
 import LoginFeedback from "./components/LoginFeedback";
+import AttendanceTable from "./components/AttendanceTable";
+import AttendanceCards from "./components/AttendanceCards";
+import StatusBadge from "./components/StatusBadge";
+import AttendanceCalendar from "./components/AttendanceCalendar";
+import AttendanceTrend from "./components/AttendanceTrend";
 import { loginErrorMessage } from "./loginErrorMessage";
 import {
   AlertCircle,
@@ -897,58 +905,39 @@ function InternPage({
   const record = attendance.find((x) => x.date === today);
   const [scanSuccess, setScanSuccess] = useState(null);
   const closeScanSuccess = useCallback(() => setScanSuccess(null), []);
+  const [attendanceLoading, setAttendanceLoading] = useState(!!supabase);
+  const [attendanceError, setAttendanceError] = useState("");
+  const [attendanceRevision, setAttendanceRevision] = useState(0);
   useEffect(() => {
     if (!supabase || !user.id) return;
+    let disposed = false;
+    let request = 0;
+    let controller;
     const load = async () => {
-      const { data, error } = await supabase
-        .from("attendance")
-        .select("date,check_in,check_out,status")
-        .eq("user_id", user.id)
-        .order("date", { ascending: false });
-      if (error) {
-        flash(error.message, "error");
-        return;
+      controller?.abort();
+      controller = new AbortController();
+      const current = ++request;
+      setAttendanceLoading(true);
+      setAttendanceError("");
+      try {
+        const data = await fetchAllPages(() => supabase.from("attendance").select("date,check_in,check_out,status").eq("user_id", user.id).order("date", { ascending: false }), controller.signal);
+        if (disposed || current !== request) return;
+        setAttendance(data.map((row) => ({ ...row, check_in: row.check_in ? formatTime(row.check_in) : null, check_out: row.check_out ? formatTime(row.check_out) : null })));
+      } catch {
+        if (!disposed && current === request) setAttendanceError("Absensi belum dapat dimuat. Periksa koneksi dan coba lagi.");
+      } finally {
+        if (!disposed && current === request) setAttendanceLoading(false);
       }
-      setAttendance(
-        (data || []).map((x) => ({
-          date: x.date,
-          check_in: x.check_in
-            ? new Intl.DateTimeFormat("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-                timeZone: "Asia/Jakarta",
-              }).format(new Date(x.check_in))
-            : null,
-          check_out: x.check_out
-            ? new Intl.DateTimeFormat("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-                timeZone: "Asia/Jakarta",
-              }).format(new Date(x.check_out))
-            : null,
-          status: x.status,
-        })),
-      );
     };
     load();
-    const channel = supabase
-      .channel("intern-attendance-" + user.id)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "attendance",
-          filter: "user_id=eq." + user.id,
-        },
-        load,
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [user.id]);
+    const channel = supabase.channel("intern-attendance-" + user.id).on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: "user_id=eq." + user.id }, load).subscribe();
+    return () => { disposed = true; controller?.abort(); supabase.removeChannel(channel); };
+  }, [user.id, attendanceRevision]);
   const processScan = async (token, location) => {
+    if (attendanceLoading || attendanceError || !attendanceDisplayState(record).canScan) {
+      flash("Absensi belum dapat diproses. Periksa status hari ini atau hubungi pembimbing.", "error");
+      return false;
+    }
     if (supabase) {
       const { data, error } = await supabase.rpc("scan_attendance", {
         qr_token: token,
@@ -1006,7 +995,13 @@ function InternPage({
     return true;
   };
   let content;
-  if (page === "scan") {
+  if ((page === "scan" || page === "dashboard") && attendanceLoading) {
+    content = <><Skeleton variant="cards" label="Memuat status absensi..." /><Skeleton variant="table" label="Memuat aktivitas..." /></>;
+  } else if ((page === "scan" || page === "dashboard") && attendanceError) {
+    content = <DataLoadError message={attendanceError} loading={false} onRetry={() => setAttendanceRevision((value) => value + 1)} />;
+  } else if (page === "scan" && !attendanceDisplayState(record).canScan) {
+    content = <div className="panel"><h2>{attendanceDisplayState(record).title}</h2><p>{attendanceDisplayState(record).description}</p><button className="outline" onClick={() => nav("dashboard")}>Kembali ke dashboard</button></div>;
+  } else if (page === "scan") {
     content = (
       <Scanner
         record={record}
@@ -1015,7 +1010,7 @@ function InternPage({
       />
     );
   } else if (page === "history") {
-    content = <History data={attendance} />;
+    content = <History data={attendance} user={user} loading={attendanceLoading} loadError={attendanceError} />;
   } else if (page === "leave") {
     content = <LeaveRequests user={user} flash={flash} />;
   } else if (page === "profile") {
@@ -1040,168 +1035,6 @@ function InternPage({
           onClose={closeScanSuccess}
         />
       )}
-    </>
-  );
-}
-function InternDashboard({ user, record, nav, attendance }) {
-  const complete = record?.check_out;
-  const history = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
-  const hadir = history.filter((x) => x.check_in).length;
-  const terlambat = history.filter((x) => x.status === "Terlambat").length;
-  const selesai = history.filter((x) => x.check_out).length;
-  const rate = hadir ? Math.round((selesai / hadir) * 100) : 0;
-  return (
-    <>
-      <div className="hero">
-        <div>
-          <span className="eyebrow">{formatDate(today)}</span>
-          <h2>
-            {complete
-              ? "Absensi hari ini selesai"
-              : "Saatnya mulai hari yang produktif!"}
-          </h2>
-          <p>
-            {complete
-              ? "Terima kasih sudah menyelesaikan absensi Anda."
-              : "Pastikan melakukan scan untuk mencatat kehadiran."}
-          </p>
-        </div>
-        <div className="hero-orb">
-          <Clock3 size={30} />
-          <b>{record?.check_in || "--:--"}</b>
-          <small>JAM MASUK</small>
-        </div>
-      </div>
-      <section className="status-grid">
-        <div className="status-card">
-          {user.photo_url ? (
-            <img
-              className="avatar large table-photo"
-              src={user.photo_url}
-              alt={user.name}
-            />
-          ) : (
-            <div className="avatar large">{user.initials}</div>
-          )}
-          <div>
-            <small>STATUS KEHADIRAN</small>
-            <h3>
-              {complete ? "Selesai" : record ? "Sudah Check-in" : "Belum Absen"}
-            </h3>
-            <span
-              className={
-                "badge " + (complete ? "green" : record ? "blue" : "gray")
-              }
-            >
-              {complete
-                ? "Hadir hari ini"
-                : record
-                  ? "Menunggu check-out"
-                  : "Belum tercatat"}
-            </span>
-          </div>
-        </div>
-        <div className="time-card">
-          <small>JAM MASUK</small>
-          <strong>{record?.check_in || "--:--"}</strong>
-          <span>{record ? "Tercatat hari ini" : "Belum melakukan scan"}</span>
-        </div>
-        <div className="time-card">
-          <small>JAM PULANG</small>
-          <strong>{record?.check_out || "--:--"}</strong>
-          <span>{complete ? "Tercatat hari ini" : "Menunggu check-out"}</span>
-        </div>
-      </section>
-      <button
-        disabled={complete}
-        className="scan-cta"
-        onClick={() => nav("scan")}
-      >
-        <span className="scan-icon">
-          <QrCode size={30} />
-        </span>
-        <span>
-          <b>
-            {complete
-              ? "ABSENSI HARI INI SELESAI"
-              : record
-                ? "SCAN UNTUK CHECK-OUT"
-                : "SCAN ABSEN"}
-          </b>
-          <small>
-            {complete ? "Sampai jumpa besok" : "Ketuk untuk membuka kamera"}
-          </small>
-        </span>
-        <ChevronLeft className="rotate" />
-      </button>
-      <section className="split">
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Ringkasan Kehadiran</h3>
-              <p>Data absensi Anda saat ini</p>
-            </div>
-            <MoreHorizontal />
-          </div>
-          <div className="metrics">
-            <div>
-              <b>{hadir}</b>
-              <span>Total hadir</span>
-            </div>
-            <div>
-              <b>{rate}%</b>
-              <span>Absensi selesai</span>
-            </div>
-            <div>
-              <b>{terlambat}</b>
-              <span>Terlambat</span>
-            </div>
-          </div>
-        </div>
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Aktivitas Terakhir</h3>
-              <p>Riwayat absensi Anda</p>
-            </div>
-            <button className="text-btn" onClick={() => nav("history")}>
-              Lihat semua
-            </button>
-          </div>
-          {history.length ? (
-            history.slice(0, 2).map((x, i) => (
-              <div className="activity" key={i}>
-                <span className="mini-icon">
-                  <CalendarDays size={16} />
-                </span>
-                <div>
-                  <b>{formatDate(x.date)}</b>
-                  <small>
-                    {x.check_in || "-"} — {x.check_out || "Belum pulang"}
-                  </small>
-                </div>
-                <span
-                  className={
-                    "badge " + (x.status === "Terlambat" ? "orange" : "green")
-                  }
-                >
-                  {x.status}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="activity">
-              <span className="mini-icon">
-                <CalendarDays size={16} />
-              </span>
-              <div>
-                <b>Belum ada aktivitas</b>
-                <small>Riwayat absensi akan tampil setelah scan pertama.</small>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
     </>
   );
 }
@@ -1306,7 +1139,7 @@ function Scanner({ record, onDone, onCancel }) {
         <ChevronLeft size={20} /> Kembali
       </button>
       <div className="scanner-copy">
-        <span className="eyebrow">{record ? "CHECK-OUT" : "CHECK-IN"}</span>
+        <span className="eyebrow">{record?.check_in ? "CHECK-OUT" : "CHECK-IN"}</span>
         <h2>Scan Absensi</h2>
         <p>Tekan tombol untuk mengizinkan lokasi dan kamera.</p>
       </div>
@@ -1351,102 +1184,104 @@ function Scanner({ record, onDone, onCancel }) {
     </div>
   );
 }
-function History({ data }) {
+function History({ data, user, loading = false, loadError = "" }) {
   const [historyDate, setHistoryDate] = useState(""),
     [historyMonth, setHistoryMonth] = useState(""),
     [historyStatus, setHistoryStatus] = useState("Semua");
   const rows = [...data]
     .filter((x) =>
-      historyDate ? x.date === historyDate : !historyMonth || x.date.startsWith(historyMonth),
+      historyDate
+        ? x.date === historyDate
+        : !historyMonth || x.date.startsWith(historyMonth),
     )
     .filter((x) => historyStatus === "Semua" || x.status === historyStatus)
     .sort((a, b) => b.date.localeCompare(a.date));
   return (
-    <div className="panel table-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Riwayat Absensi</h2>
-          <p>Catatan kehadiran magang Anda</p>
+    <>
+      <AttendanceCalendar client={supabase} user={user} data={data} />
+      <div className="panel table-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Riwayat Absensi</h2>
+            <p>Catatan kehadiran magang Anda</p>
+          </div>
         </div>
+        <div className="history-filters">
+          <input
+            type="date"
+            value={historyDate}
+            onChange={(event) => {
+              setHistoryDate(event.target.value);
+              if (event.target.value) setHistoryMonth("");
+            }}
+            aria-label="Filter tanggal absensi"
+          />
+          <input
+            type="month"
+            value={historyMonth}
+            onChange={(event) => {
+              setHistoryMonth(event.target.value);
+              if (event.target.value) setHistoryDate("");
+            }}
+            aria-label="Filter bulan absensi"
+          />
+          <select
+            value={historyStatus}
+            onChange={(event) => setHistoryStatus(event.target.value)}
+            aria-label="Filter status absensi"
+          >
+            <option>Semua</option>
+            <option>Hadir</option>
+            <option>Terlambat</option>
+            <option>Izin</option>
+            <option>Sakit</option>
+            <option>Alpa</option>
+          </select>
+        </div>
+        {loading ? <Skeleton variant="table" label="Memuat riwayat absensi..." /> : loadError ? <p className="error" role="alert">{loadError}</p> : rows.length ? (
+          <>
+            <AttendanceCards
+              rows={rows.map((row) => ({
+                ...user,
+                ...row,
+                in: row.check_in,
+                out: row.check_out,
+              }))}
+            />
+            <table className="attendance-desktop-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Jam Masuk</th>
+                  <th>Jam Pulang</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((x, i) => (
+                  <tr key={i}>
+                    <td>
+                      <b>{formatDate(x.date)}</b>
+                    </td>
+                    <td>{x.check_in || "-"}</td>
+                    <td>{x.check_out || "-"}</td>
+                    <td>
+                      <StatusBadge status={x.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : (
+          <p className="empty-state">
+            {data.length
+              ? "Tidak ada riwayat sesuai filter."
+              : "Belum ada riwayat absensi."}
+          </p>
+        )}
       </div>
-      <div className="history-filters">
-        <input
-          type="date"
-          value={historyDate}
-          onChange={(event) => {
-            setHistoryDate(event.target.value);
-            if (event.target.value) setHistoryMonth("");
-          }}
-          aria-label="Filter tanggal absensi"
-        />
-        <input
-          type="month"
-          value={historyMonth}
-          onChange={(event) => {
-            setHistoryMonth(event.target.value);
-            if (event.target.value) setHistoryDate("");
-          }}
-          aria-label="Filter bulan absensi"
-        />
-        <select
-          value={historyStatus}
-          onChange={(event) => setHistoryStatus(event.target.value)}
-          aria-label="Filter status absensi"
-        >
-          <option>Semua</option>
-          <option>Hadir</option>
-          <option>Terlambat</option>
-          <option>Izin</option>
-          <option>Sakit</option>
-          <option>Alpa</option>
-        </select>
-      </div>
-      {rows.length ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Jam Masuk</th>
-              <th>Jam Pulang</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((x, i) => (
-              <tr key={i}>
-                <td>
-                  <b>{formatDate(x.date)}</b>
-                </td>
-                <td>{x.check_in || "-"}</td>
-                <td>{x.check_out || "-"}</td>
-                <td>
-                  <span
-                    className={
-                      "badge " +
-                      ({
-                        Hadir: "green",
-                        Terlambat: "orange",
-                        Izin: "blue",
-                        Sakit: "purple",
-                        Alpa: "red",
-                      }[x.status] || "gray")
-                    }
-                  >
-                    {x.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="empty-state">
-          {data.length
-            ? "Tidak ada riwayat sesuai filter."
-            : "Belum ada riwayat absensi."}
-        </p>
-      )}
-    </div>
+    </>
   );
 }
 function Profile({ user, updateUser }) {
@@ -1776,7 +1611,7 @@ function AdminPage({ page, nav, flash }) {
         flash={flash}
       />
     );
-  if (page === "reports") return <Reports flash={flash} rows={rows} />;
+  if (page === "reports") return <AttendanceReports client={supabase} flash={flash} />;
   if (page === "settings") return <SettingsPage />;
   return <AdminDashboard rows={rows} nav={nav} loading={loading} />;
 }
@@ -1792,7 +1627,7 @@ function AdminDashboard({ rows, nav, loading }) {
   ];
   return (
     <>
-      <section className="stat-grid">
+      {loading ? <Skeleton variant="cards" label="Memuat ringkasan admin..." /> : <section className="stat-grid">
         {stats.map(([n, l, I, c]) => (
           <div className="stat-card" key={l}>
             <span className={"stat-icon " + c}>
@@ -1804,7 +1639,8 @@ function AdminDashboard({ rows, nav, loading }) {
             </div>
           </div>
         ))}
-      </section>
+      </section>}
+      <AttendanceTrend client={supabase} />
       <section className="panel table-panel">
         <div className="panel-heading">
           <div>
@@ -1815,141 +1651,9 @@ function AdminDashboard({ rows, nav, loading }) {
             Lihat monitoring
           </button>
         </div>
-        <AttendanceTable rows={rows} />
+        <AttendanceTable rows={rows} loading={loading} />
       </section>
     </>
-  );
-}
-function AttendanceTable({
-  rows,
-  onEdit,
-  onDelete,
-  onHistory,
-  onToggleActive,
-  onPhotoClick,
-  showAttendance = true,
-}) {
-  const manageable = !!(onEdit || onDelete || onHistory || onToggleActive);
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th>Nama</th>
-          <th>Universitas</th>
-          <th>Jurusan</th>
-          {showAttendance && <th>Jam Masuk</th>}
-          {showAttendance && <th>Jam Pulang</th>}
-          {showAttendance && <th>Status</th>}
-          {manageable && <th>Aksi</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {!rows.length && (
-          <tr>
-            <td
-              colSpan={(showAttendance ? 6 : 3) + (manageable ? 1 : 0)}
-              className="empty-table"
-            >
-              Belum ada data anak magang di database.
-            </td>
-          </tr>
-        )}
-        {rows.map((x, i) => (
-          <tr key={x.id || i}>
-            <td>
-              <span className="person">
-                {x.photo_url ? (
-                  <button
-                    type="button"
-                    className="table-photo-button"
-                    onClick={() => onPhotoClick?.(x)}
-                    disabled={!onPhotoClick}
-                    aria-label={
-                      onPhotoClick
-                        ? `Lihat foto profil ${x.name}`
-                        : undefined
-                    }
-                  >
-                    <img
-                      className="avatar small table-photo"
-                      src={x.photo_url}
-                      alt={onPhotoClick ? "" : x.name}
-                    />
-                  </button>
-                ) : (
-                  <span className="avatar small">{x.initials}</span>
-                )}
-                <b>{x.name}</b>
-                {onToggleActive && !x.is_active && (
-                  <span className="badge red">Nonaktif</span>
-                )}
-              </span>
-            </td>
-            <td>{x.university}</td>
-            <td>{x.major}</td>
-            {showAttendance && <td>{x.in}</td>}
-            {showAttendance && (
-              <td>
-                {x.out}
-                {x.checkoutEarly && (
-                  <small className="checkout-early">Pulang cepat</small>
-                )}
-              </td>
-            )}
-            {showAttendance && (
-              <td>
-                <span
-                  className={
-                    "badge " +
-                    ({
-                      Hadir: "green",
-                      Terlambat: "orange",
-                      Izin: "blue",
-                      Sakit: "purple",
-                      Alpa: "red",
-                      Nonaktif: "red",
-                      "Belum Absen": "gray",
-                    }[x.status] || "gray")
-                  }
-                >
-                  {x.status}
-                </span>
-                {x.checkoutPending && (
-                  <small className="checkout-pending">Belum check-out</small>
-                )}
-              </td>
-            )}
-            {manageable && (
-              <td className="table-actions">
-                {onHistory && (
-                  <button className="text-btn" onClick={() => onHistory(x)}>
-                    Riwayat
-                  </button>
-                )}
-                {onEdit && (
-                  <button className="text-btn" onClick={() => onEdit(x)}>
-                    Edit
-                  </button>
-                )}
-                {onToggleActive && (
-                  <button
-                    className="text-btn"
-                    onClick={() => onToggleActive(x)}
-                  >
-                    {x.is_active ? "Nonaktifkan" : "Aktifkan"}
-                  </button>
-                )}
-                {onDelete && (
-                  <button className="text-btn danger-btn" onClick={() => onDelete(x)}>
-                    Hapus
-                  </button>
-                )}
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }
 function TablePagination({ page, totalItems, pageSize = 10, onChange }) {
@@ -2233,7 +1937,7 @@ function Monitoring({
           <option value="attended">Sudah Absen</option>
         </select>
       </div>
-      <AttendanceTable rows={visibleRows} />
+      <AttendanceTable rows={visibleRows} loading={loading} />
       <TablePagination
         page={activePage}
         totalItems={filtered.length}
@@ -2475,6 +2179,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         </select>
       </div>
       <AttendanceTable
+        loading={loading}
         rows={visibleRows}
         onHistory={setViewingHistory}
         onEdit={edit}
@@ -2602,6 +2307,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
 
 function InternHistoryModal({ intern, onClose }) {
   const [rows, setRows] = useState([]),
+    [historyError, setHistoryError] = useState(""),
     [loading, setLoading] = useState(true),
     [historyDate, setHistoryDate] = useState(""),
     [historyMonth, setHistoryMonth] = useState(""),
@@ -2617,14 +2323,19 @@ function InternHistoryModal({ intern, onClose }) {
       .eq("user_id", intern.id)
       .order("date", { ascending: false })
       .then(({ data, error }) => {
-        if (error) return;
+        if (error) setHistoryError("Riwayat belum dapat dimuat. Tutup lalu buka kembali untuk mencoba lagi.");
         setRows(data || []);
+        setLoading(false);
+      }).catch(() => {
+        setHistoryError("Riwayat belum dapat dimuat. Periksa koneksi lalu coba lagi.");
         setLoading(false);
       });
   }, [intern.id]);
   const filtered = rows
     .filter((x) =>
-      historyDate ? x.date === historyDate : !historyMonth || x.date.startsWith(historyMonth),
+      historyDate
+        ? x.date === historyDate
+        : !historyMonth || x.date.startsWith(historyMonth),
     )
     .filter((x) => historyStatus === "Semua" || x.status === historyStatus);
   return (
@@ -2670,48 +2381,47 @@ function InternHistoryModal({ intern, onClose }) {
           </select>
         </div>
         {loading ? (
-          <p className="empty-state">Memuat riwayat...</p>
-        ) : filtered.length ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Jam Masuk</th>
-                <th>Jam Pulang</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((x, i) => (
-                <tr key={i}>
-                  <td>
-                    <b>{formatDate(x.date)}</b>
-                  </td>
-                  <td>{formatTime(x.check_in)}</td>
-                  <td>{formatTime(x.check_out)}</td>
-                  <td>
-                    <span
-                      className={
-                        "badge " +
-                        ({
-                          Hadir: "green",
-                          Terlambat: "orange",
-                          Izin: "blue",
-                          Sakit: "purple",
-                          Alpa: "red",
-                        }[x.status] || "gray")
-                      }
-                    >
-                      {x.status}
-                    </span>
-                  </td>
+          <Skeleton variant="table" label="Memuat riwayat absensi..." />
+        ) : historyError ? <p className="error" role="alert">{historyError}</p> : filtered.length ? (
+          <>
+            <AttendanceCards
+              rows={filtered.map((row) => ({
+                ...intern,
+                ...row,
+                in: formatTime(row.check_in),
+                out: formatTime(row.check_out),
+              }))}
+            />
+            <table className="attendance-desktop-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Jam Masuk</th>
+                  <th>Jam Pulang</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((x, i) => (
+                  <tr key={i}>
+                    <td>
+                      <b>{formatDate(x.date)}</b>
+                    </td>
+                    <td>{formatTime(x.check_in)}</td>
+                    <td>{formatTime(x.check_out)}</td>
+                    <td>
+                      <StatusBadge status={x.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         ) : (
           <p className="empty-state">
-            {rows.length ? "Tidak ada riwayat sesuai filter." : "Belum ada riwayat absensi."}
+            {rows.length
+              ? "Tidak ada riwayat sesuai filter."
+              : "Belum ada riwayat absensi."}
           </p>
         )}
       </div>
@@ -3309,98 +3019,6 @@ function AdminWorkflows({ rows, refresh, flash }) {
         </div>
       )}
     </div>
-  );
-}
-function Reports({ flash, rows }) {
-  const [mode, setMode] = useState("month");
-  const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [attendance, setAttendance] = useState([]);
-  const [sickRequests, setSickRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const period = mode === "month" ? selectedMonth : selectedDate;
-  const range = useMemo(() => {
-    if (mode === "date") return { from: selectedDate, to: selectedDate };
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const last = new Date(year, month, 0).getDate();
-    return { from: `${selectedMonth}-01`, to: `${selectedMonth}-${String(last).padStart(2, "0")}` };
-  }, [mode, selectedMonth, selectedDate]);
-  const load = async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const [{ data: attendanceData, error }, { data: requestData, error: requestError }] = await Promise.all([
-      supabase.from("attendance").select("user_id,date,check_in,check_out,status").gte("date", range.from).lte("date", range.to).order("date"),
-      supabase.from("leave_requests").select("user_id,type,date_from,date_to,reason,status").eq("type", "Sakit").eq("status", "Disetujui").lte("date_from", range.to).gte("date_to", range.from),
-    ]);
-    if (error || requestError) flash((error || requestError).message, "error");
-    else { setAttendance(attendanceData || []); setSickRequests(requestData || []); }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, [range.from, range.to]);
-  const nameOf = (id) => rows.find((x) => x.id === id);
-  const reportRows = attendance.map((item) => {
-    const person = nameOf(item.user_id);
-    return { ...item, name: person?.name || "Anak magang", university: person?.university || "-", major: person?.major || "-", in: item.check_in ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(item.check_in)) : "-", out: item.check_out ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(item.check_out)) : "-" };
-  });
-  const summary = rows.map((person) => {
-    const own = attendance.filter((item) => item.user_id === person.id);
-    return { name: person.name, hadir: own.filter((x) => x.status === "Hadir").length, terlambat: own.filter((x) => x.status === "Terlambat").length, sakit: own.filter((x) => x.status === "Sakit").length, alpa: own.filter((x) => x.status === "Alpa").length };
-  });
-  const approvedSick = sickRequests.map((item) => ({ ...item, name: nameOf(item.user_id)?.name || "Anak magang" }));
-  const hadir = summary.reduce((total, item) => total + item.hadir, 0);
-  const terlambat = summary.reduce((total, item) => total + item.terlambat, 0);
-  const sakit = summary.reduce((total, item) => total + item.sakit, 0);
-  const alpa = summary.reduce((total, item) => total + item.alpa, 0);
-  const payload = { rows: reportRows, summary, requests: approvedSick, label: mode === "month" ? new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date(`${selectedMonth}-01T00:00:00`)) : formatDate(selectedDate), fileKey: period };
-  const excel = async () => {
-    await exportAttendanceExcel(payload);
-    flash("File Excel berhasil diunduh.");
-  };
-  const pdf = async () => {
-    await exportAttendancePdf(payload);
-    flash("File PDF berhasil diunduh.");
-  };
-  return (
-    <>
-      <div className="panel report-filter">
-        <div>
-          <h2>Rekap Laporan</h2>
-          <p>Pilih tanggal atau bulan untuk melihat dan mengunduh rekap.</p>
-        </div>
-        <select value={mode} onChange={(event) => setMode(event.target.value)}>
-          <option value="date">Tanggal</option>
-          <option value="month">Bulanan</option>
-        </select>
-        <input type={mode === "month" ? "month" : "date"} value={mode === "month" ? selectedMonth : selectedDate} onChange={(event) => mode === "month" ? setSelectedMonth(event.target.value) : setSelectedDate(event.target.value)} />
-        <button className="primary" onClick={load} disabled={loading}>{loading ? "Memuat..." : "Tampilkan"}</button>
-      </div>
-      <section className="stat-grid report-stats">
-        {[
-          [String(hadir), "Hadir"],
-          [String(terlambat), "Terlambat"],
-          [String(sakit), "Sakit"],
-          [String(alpa), "Alpa"],
-        ].map((x) => (
-          <div className="stat-card simple" key={x[1]}>
-            <b>{x[0]}</b>
-            <small>{x[1]}</small>
-          </div>
-        ))}
-      </section>
-      <div className="panel export">
-        <FileText size={28} />
-        <div>
-          <h3>Unduh laporan absensi</h3>
-          <p>Ekspor {payload.label}, termasuk rekap per peserta dan sakit yang disetujui.</p>
-        </div>
-        <button className="outline" onClick={excel}>
-          <Download size={16} /> Export Excel
-        </button>
-        <button className="primary" onClick={pdf}>
-          <Download size={16} /> Export PDF
-        </button>
-      </div>
-    </>
   );
 }
 function SettingsPage() {

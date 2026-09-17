@@ -1,0 +1,50 @@
+.report-summary {
+  margin: 20px 0;
+}
+.report-summary h3 {
+  font-size: 16px;
+}
+.report-explanation {
+  font-size: 12px;
+  color: #617187;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.report-summary-desktop {
+  overflow-x: auto;
+}
+.report-summary-mobile {
+  display: none;
+}
+@media (max-width: 640px) {
+  .report-summary-desktop {
+    display: none;
+  }
+  .report-summary-mobile {
+    display: grid;
+    gap: 12px;
+  }
+  .report-summary-mobile article {
+    border: 1px solid #e5ece8;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .report-summary-mobile h4 {
+    overflow-wrap: anywhere;
+  }
+  .report-summary-mobile dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 8px;
+    margin-top: 14px;
+  }
+  .report-summary-mobile dt {
+    font-size: 11px;
+    color: #617187;
+  }
+  .report-summary-mobile dd {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+}
