@@ -1,5 +1,3 @@
-import { shiftDate } from "./attendanceVisuals.js";
-
 export function attendanceDisplayState(record) {
   const status = record?.status || "Belum Absen";
   const nonAttendance = ["Izin", "Sakit", "Alpa"].includes(status);
@@ -63,24 +61,6 @@ export function summarizeAttendance(people, records, { from, to, today }) {
     const own = byUser.get(person.id) || new Map();
     const count = (status) =>
       [...own.values()].filter((row) => row.status === status).length;
-    // Without a start (or an end for an inactive account), expected dates are unknown.
-    let missing =
-      !person.internship_start ||
-      (person.is_active === false && !person.internship_end)
-        ? null
-        : 0;
-    if (missing !== null) {
-      const first =
-        person.internship_start > from ? person.internship_start : from;
-      const last =
-        person.internship_end && person.internship_end < cutoff
-          ? person.internship_end
-          : cutoff;
-      for (let day = first; day <= last; day = shiftDate(day, 1)) {
-        const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
-        if (weekday >= 1 && weekday <= 5 && !own.has(day)) missing++;
-      }
-    }
     return {
       id: person.id,
       name: person.name,
@@ -89,13 +69,12 @@ export function summarizeAttendance(people, records, { from, to, today }) {
       izin: count("Izin"),
       sakit: count("Sakit"),
       alpa: count("Alpa"),
-      missing,
     };
   });
 }
 
 export const REPORT_NOTE =
-  "Tanpa catatan dihitung hanya pada Senin–Jumat dalam masa magang hingga hari ini. Sabtu opsional dan Minggu libur; catatan akhir pekan tetap disertakan. Alpa hanya dihitung jika tercatat, bukan ditetapkan otomatis. Tanda — berarti periode magang belum lengkap. Libur khusus belum diperhitungkan.";
+  "Rekap menghitung status absensi yang tersimpan pada periode pilihan hingga hari ini, termasuk catatan akhir pekan. Hadir, Terlambat, Izin, Sakit, dan Alpa dihitung terpisah. Alpa hanya dihitung jika tercatat, bukan ditetapkan otomatis.";
 
 export async function fetchAllPages(makeQuery, signal) {
   const rows = [];

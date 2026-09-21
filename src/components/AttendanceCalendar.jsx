@@ -207,8 +207,8 @@ export default function AttendanceCalendar({ client, user, data }) {
       )}
       <p className="visual-note">
         Minggu libur, Sabtu masuk opsional. Belum Absen hanya ditampilkan pada
-        Senin–Jumat tanpa catatan, bukan otomatis Alpa. Catatan absensi akhir
-        pekan tetap ditampilkan.
+        Senin–Jumat saat absensi belum tercatat, bukan otomatis Alpa. Catatan
+        absensi akhir pekan tetap ditampilkan.
       </p>
     </section>
   );

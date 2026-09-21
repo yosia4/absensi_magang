@@ -51,7 +51,7 @@ const person = {
 };
 const range = { from: "2026-09-01", to: "2026-09-30", today: "2026-09-07" };
 
-test("reports count Izin separately and distinguish missing weekdays from recorded Alpa", () => {
+test("reports count only recorded statuses and keep Izin separate from Alpa", () => {
   const rows = [
     { user_id: "a", date: "2026-09-01", status: "Hadir" },
     { user_id: "a", date: "2026-09-02", status: "Izin" },
@@ -69,26 +69,25 @@ test("reports count Izin separately and distinguish missing weekdays from record
     izin: 1,
     sakit: 0,
     alpa: 1,
-    missing: 2,
   });
 });
 
-test("weekends and future periods never add missing attendance", () => {
+test("empty weekends and future periods never create attendance counts", () => {
   const [weekend] = summarizeAttendance([person], [], {
     from: "2026-09-05",
     to: "2026-09-06",
     today: "2026-09-07",
   });
-  assert.equal(weekend.missing, 0);
+  assert.equal(weekend.alpa, 0);
   const [future] = summarizeAttendance([person], [], {
     from: "2026-09-08",
     to: "2026-09-30",
     today: "2026-09-07",
   });
-  assert.equal(future.missing, 0);
+  assert.equal(future.alpa, 0);
 });
 
-test("missing attendance respects internship bounds and unknown dates", () => {
+test("incomplete internship dates never create absence counts", () => {
   const profiles = [
     { ...person, internship_start: "2026-09-03", internship_end: "2026-09-04" },
     { ...person, id: "b", internship_start: null },
@@ -96,8 +95,8 @@ test("missing attendance respects internship bounds and unknown dates", () => {
     { ...person, id: "d", is_active: false, internship_end: "2026-09-02" },
   ];
   assert.deepEqual(
-    summarizeAttendance(profiles, [], range).map((row) => row.missing),
-    [2, null, null, 2],
+    summarizeAttendance(profiles, [], range).map((row) => row.alpa),
+    [0, 0, 0, 0],
   );
 });
 
@@ -109,5 +108,4 @@ test("selected date only counts that date, preserving zero counts", () => {
   );
   assert.equal(result.izin, 0);
   assert.equal(result.alpa, 0);
-  assert.equal(result.missing, 1);
 });

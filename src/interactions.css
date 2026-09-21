@@ -1,0 +1,73 @@
+/* Keep feedback brief, with no movement of buttons or surrounding content. */
+.app-shell button,
+.app-shell input,
+.app-shell select,
+.app-shell textarea,
+.app-shell summary {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+.app-shell button:hover,
+.app-shell button:active {
+  transform: none;
+}
+.app-shell button:disabled {
+  filter: none;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+@media (hover: hover) and (pointer: fine) {
+  .app-shell button:not(:disabled):hover {
+    filter: brightness(0.96);
+  }
+  .app-shell summary:hover {
+    color: #14734d;
+    background-color: #f3f8f5;
+  }
+}
+.app-shell button:not(:disabled):active {
+  filter: brightness(0.91);
+  box-shadow: none;
+}
+.app-shell :is(button, a, summary):focus-visible {
+  outline: 2px solid #188258;
+  outline-offset: 3px;
+}
+.app-shell :is(input, select, textarea):focus {
+  outline: 2px solid #188258;
+  outline-offset: 2px;
+  border-color: #188258;
+  box-shadow: 0 0 0 4px #18825814;
+}
+.app-shell :is(input, select, textarea):disabled {
+  cursor: not-allowed;
+}
+.app-shell details[open] > :not(summary) {
+  animation: detail-reveal 160ms ease-out;
+}
+.participant-account-details summary > svg {
+  transition: transform 160ms ease;
+}
+@keyframes detail-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

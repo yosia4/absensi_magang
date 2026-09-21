@@ -1,0 +1,300 @@
+.panel.participant-profile {
+  max-width: 1080px;
+  padding: 28px;
+  border: 1px solid #dfeae3;
+  border-top: 4px solid #188258;
+  border-radius: 20px;
+  background: linear-gradient(130deg, #f2faf5, #fff 42%);
+  min-width: 0;
+}
+.participant-profile-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.participant-eyebrow {
+  color: #16734e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+}
+.participant-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+}
+.participant-identity {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 24px 0 30px;
+}
+.participant-photo,
+.participant-initials {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 112px;
+  height: 112px;
+  padding: 5px;
+  border: 1px solid #c9e0d2;
+  border-radius: 28px;
+  background: #e7f3eb;
+  color: #176b48;
+  box-shadow: 0 6px 18px #215e3710;
+}
+.participant-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 22px;
+}
+.participant-initials {
+  font-size: 35px;
+  font-weight: 700;
+}
+.participant-name {
+  min-width: 0;
+}
+.participant-name h2 {
+  font-size: 28px;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+  color: #203e30;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.participant-name p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 13px;
+  color: #64786b;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.participant-name svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.participant-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.participant-account.is-active {
+  color: #166c43;
+  background: #e7f4ec;
+}
+.participant-account.is-inactive {
+  color: #6a737b;
+  background: #edf0f2;
+}
+.participant-period {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 24px;
+  padding-top: 26px;
+  border-top: 1px solid #e1ebe5;
+}
+.participant-period-info {
+  min-width: 0;
+}
+.participant-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.participant-section-heading h3 {
+  font-size: 17px;
+  color: #294735;
+}
+.participant-section-heading > span {
+  font-size: 12px;
+  color: #667c6e;
+}
+.participant-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.participant-dates > div {
+  padding: 15px;
+  border: 1px solid #e5ece7;
+  border-radius: 12px;
+  background: #fff;
+}
+.participant-dates dt,
+.participant-account-details dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #687e70;
+}
+.participant-dates dd {
+  margin: 10px 0 0;
+  color: #304d3c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.participant-progress {
+  margin-top: 20px;
+}
+.participant-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #667d6f;
+  font-size: 12px;
+  margin-bottom: 9px;
+}
+.participant-progress b {
+  color: #14724b;
+}
+.participant-progress progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 7px;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #e6efe9;
+  color: #188258;
+}
+.participant-progress progress::-webkit-progress-bar {
+  background: #e6efe9;
+  border-radius: 10px;
+}
+.participant-progress progress::-webkit-progress-value {
+  background: #188258;
+  border-radius: 10px;
+}
+.participant-progress progress::-moz-progress-bar {
+  background: #188258;
+  border-radius: 10px;
+}
+.participant-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid #d6e9dd;
+  border-radius: 15px;
+  background: #edf7f1;
+  color: #1c774f;
+}
+.participant-countdown > span {
+  font-size: 12px;
+  font-weight: 600;
+}
+.participant-countdown b {
+  font-size: 38px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.participant-countdown > div > span {
+  font-size: 13px;
+}
+.participant-countdown p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #607d6c;
+}
+.participant-account-details {
+  margin-top: 25px;
+  border-top: 1px solid #e1ebe5;
+}
+.participant-account-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0 5px;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+  color: #315a43;
+  font-size: 13px;
+  font-weight: 600;
+}
+.participant-account-details summary::-webkit-details-marker {
+  display: none;
+}
+.participant-account-details summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.participant-account-details[open] summary > svg {
+  transform: rotate(180deg);
+}
+.participant-account-details dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 18px;
+}
+.participant-account-details dd {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #314b3b;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+@media (max-width: 1000px) {
+  .participant-period {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .panel.participant-profile {
+    padding: 20px;
+    border-radius: 16px;
+  }
+  .participant-eyebrow {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .participant-edit {
+    font-size: 12px;
+    padding: 9px;
+  }
+  .participant-identity {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 17px;
+  }
+  .participant-photo,
+  .participant-initials {
+    width: 88px;
+    height: 88px;
+    border-radius: 23px;
+  }
+  .participant-photo img {
+    border-radius: 18px;
+  }
+  .participant-name h2 {
+    font-size: 23px;
+  }
+  .participant-dates,
+  .participant-account-details dl {
+    grid-template-columns: 1fr;
+  }
+  .participant-period {
+    gap: 18px;
+  }
+}

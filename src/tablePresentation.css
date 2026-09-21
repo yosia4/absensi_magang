@@ -1,0 +1,69 @@
+.app-shell table thead th {
+  padding: 14px 12px;
+  background: #f1f7f3;
+  color: #4d6758;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+  border-bottom: 1px solid #dce8df;
+}
+.app-shell table thead th:first-child {
+  border-radius: 9px 0 0 0;
+}
+.app-shell table thead th:last-child {
+  border-radius: 0 9px 0 0;
+}
+.app-shell table tbody td {
+  padding: 16px 12px;
+  border-bottom: 1px solid #e7eee9;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 140ms ease;
+}
+.app-shell table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.app-shell table tbody tr:focus-within td {
+  background: #eef7f1;
+}
+.app-shell table tbody tr:active td {
+  background: #e8f3ec;
+}
+@media (hover: hover) and (pointer: fine) {
+  .app-shell table tbody tr:hover td {
+    background: #f4f9f5;
+  }
+}
+.app-shell .person b,
+.app-shell .report-person {
+  color: #284b36;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.app-shell .attendance-desktop-table td:nth-child(2),
+.app-shell .attendance-desktop-table td:nth-child(3) {
+  color: #687c70;
+  font-size: 13px;
+}
+.app-shell .report-university {
+  color: #6c7d72;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.app-shell .attendance-mobile-card:active,
+.app-shell .attendance-mobile-card:focus-within,
+.app-shell .report-summary-mobile article:focus-within {
+  border-color: #bdd9c6;
+  background: #f7fbf8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell table tbody td {
+    transition: none;
+  }
+}
+@media print {
+  .app-shell table tbody td {
+    background: transparent !important;
+  }
+}

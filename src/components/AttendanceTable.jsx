@@ -2,6 +2,8 @@ import React from "react";
 import AttendanceCards from "./AttendanceCards";
 import StatusBadge from "./StatusBadge";
 import Skeleton from "./Skeleton";
+import EmptyState from "./EmptyState";
+import { Users } from "lucide-react";
 
 export default function AttendanceTable({
   rows,
@@ -12,10 +14,20 @@ export default function AttendanceTable({
   onToggleActive,
   onPhotoClick,
   showAttendance = true,
+  emptyState,
 }) {
   const manageable = !!(onEdit || onDelete || onHistory || onToggleActive);
   if (loading)
     return <Skeleton variant="table" label="Memuat daftar peserta…" />;
+  if (!rows.length)
+    return (
+      <EmptyState
+        icon={Users}
+        title="Belum ada peserta"
+        description="Data peserta akan tampil di sini setelah ditambahkan oleh admin."
+        {...emptyState}
+      />
+    );
   return (
     <>
       <AttendanceCards
@@ -42,16 +54,6 @@ export default function AttendanceTable({
           </tr>
         </thead>
         <tbody>
-          {!rows.length && (
-            <tr>
-              <td
-                colSpan={(showAttendance ? 6 : 3) + (manageable ? 1 : 0)}
-                className="empty-table"
-              >
-                Belum ada data anak magang di database.
-              </td>
-            </tr>
-          )}
           {rows.map((x, i) => (
             <tr key={x.id || i}>
               <td>

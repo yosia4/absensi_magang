@@ -48,6 +48,10 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 ### Admin/Pembimbing
 
 - Login sebagai admin.
+- Halaman pengajuan memakai kartu berisi nama peserta, ikon jenis pengajuan, tanggal, alasan, dan status. Bagian persetujuan hanya menampilkan pengajuan menunggu; seluruh pengajuan tetap tersedia dalam riwayat. Alasan penolakan ditampilkan dalam kotak merah muda lembut yang juga terlihat oleh peserta.
+- Dashboard Admin menampilkan tanggal hari ini dalam WIB dan ringkasan kehadiran dengan aksen hijau Rawuh Pustaka. Kartu memisahkan seluruh akun peserta, akun aktif, serta Sudah Check-in (termasuk terlambat), dengan warna Hadir hijau, Terlambat kuning, Izin biru, Sakit ungu, dan Alpa merah.
+- Panel **Perlu ditindaklanjuti** menampilkan pengajuan menunggu, peserta belum check-out setelah jam pulang dari pengaturan, serta peserta aktif yang masa magangnya selesai hari ini hingga tujuh hari ke depan. Setiap bagian menyediakan tombol ke halaman terkait.
+- Jumlah pengajuan berstatus **Menunggu** ditandai badge merah hanya pada menu Kelola Pengajuan di desktop maupun ponsel. Dashboard menampilkan jumlah pengajuan dalam panel tindak lanjut tanpa badge. Jumlah mencakup izin, sakit, dan lupa absen; diperbarui melalui Realtime, setelah persetujuan/penolakan, saat tab kembali aktif, dan pemeriksaan berkala setiap 30 detik. Badge hilang saat tidak ada pengajuan menunggu.
 - Menambah akun anak magang dengan nama, email, kata sandi, universitas, jurusan, serta periode magang.
 - Melihat daftar anak magang dari database secara real-time.
 - Mengubah data anak magang.
@@ -55,12 +59,18 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 - Membuat QR Code absensi berdasarkan lokasi meja absensi.
 - Memantau status hadir, terlambat, check-in, dan check-out.
 - Melihat ringkasan laporan kehadiran.
-- Rekap layar, Excel, dan PDF memisahkan Hadir, Terlambat, Izin, Sakit, Alpa, serta **Tanpa catatan**. Tanpa catatan dihitung pada Senin–Jumat dalam periode magang hingga hari ini; Sabtu opsional dan Minggu libur. Alpa hanya dihitung dari status yang tersimpan. Tanggal libur khusus belum diperhitungkan. Periode magang yang belum lengkap ditandai **—** agar tidak menghasilkan perkiraan ketidakhadiran.
+- Halaman **Laporan Kehadiran** menyediakan periode aktif, pilihan jenis periode Tanggal/Bulanan/Rentang tanggal, serta validasi tanggal sebelum laporan ditampilkan melalui tombol Tampilkan. Tombol unduh Excel dan PDF berada di bagian atas.
+- Kartu status memakai ikon dan warna yang konsisten. Jumlah peserta dipisahkan dari jumlah catatan absensi.
+- Rekap menampilkan universitas, pilihan Semua peserta atau satu peserta, pencarian nama, pengurutan berdasarkan nama/keterlambatan, serta rincian absensi dalam WIB saat nama peserta diklik. Pilihan peserta menggunakan ID akun dan berlaku bersama pencarian pada ringkasan, tabel, Excel, dan PDF. Memilih peserta mengosongkan pencarian sebelumnya; nama peserta disertakan pada nama berkas unduhan individual.
+- PDF hanya memuat rekap per peserta, tanpa tabel absensi harian, rincian izin/sakit, atau teks pencarian dan aturan perhitungan. Laporan satu peserta menampilkan identitas (nama, universitas, jurusan, masa magang), tabel status vertikal, dan total absensi tercatat. Laporan banyak peserta menampilkan nomor urut, identitas, lima status, serta total per peserta dan keseluruhan. Informasi menggunakan data tersimpan; tanggal magang yang kosong ditandai Belum diisi.
+- PDF tetap memuat logo Rawuh Pustaka, periode, waktu cetak WIB, nomor halaman, serta ruang tanda tangan pembimbing opsional. Kolom nama pembimbing tersedia di samping centang tanda tangan dan wajib diisi jika tanda tangan diaktifkan; nama dicetak di bawah ruang tanda tangan. Kepala tabel diulang saat berpindah halaman. Excel menyertakan data absensi dan pengajuan sesuai peserta terpilih, serta informasi periode, pilihan peserta, pencarian, dan satuan pada lembar Keterangan.
+- Rekap layar, Excel, dan PDF memisahkan Hadir, Terlambat, Izin, Sakit, dan Alpa berdasarkan status yang tersimpan pada periode pilihan hingga hari ini. Catatan akhir pekan tetap disertakan. Alpa hanya dihitung dari status yang tersimpan.
 - Melihat grafik tren kehadiran mingguan atau bulanan di dashboard. Pilih batang/tanggal untuk melihat jumlah Hadir, Terlambat, Izin, Sakit, dan Alpa pada hari tersebut.
 
 ### Anak Magang
 
 - Login menggunakan email dan kata sandi yang dibuat admin.
+- Menu **Izin / Sakit** di desktop dan ponsel menampilkan badge merah untuk balasan persetujuan atau penolakan yang belum dibaca, termasuk pengajuan lupa absen. Badge diperbarui melalui Realtime dan pemeriksaan berkala. Balasan ditandai dibaca setelah riwayat pengajuan berhasil tampil tanpa filter, atau melalui panel notifikasi; status dibaca tersimpan di database sehingga tetap berlaku saat login ulang.
 - Dashboard dengan data absensi aktual, tanpa data contoh.
 - Dashboard membedakan Izin, Sakit, Alpa, belum absen, sudah check-in, dan absensi selesai. Check-out hanya ditawarkan jika ada jam masuk. Status Izin/Sakit/Alpa serta catatan tanpa jam masuk yang perlu ditinjau tidak membuka scanner dari antarmuka peserta.
 - Scan QR melalui kamera perangkat.
@@ -70,10 +80,11 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 - Melihat riwayat absensi aktual.
 - Melihat kalender kehadiran berwarna pada halaman Riwayat, berpindah bulan, dan memilih tanggal untuk melihat status serta jam masuk/pulang.
 - Melihat dan mengubah profil, email, serta kata sandi.
+- Profil peserta menampilkan foto atau inisial, nama, universitas, status akun sesuai data, tanggal mulai/selesai, dan sisa masa magang dalam satu kartu. Sisa hari menggunakan hari kalender WIB termasuk hari ini; sebelum mulai ditampilkan hitung mundur menuju hari pertama, sedangkan periode berakhir menampilkan nol hari. Tanggal yang belum lengkap atau tidak valid tidak menghasilkan angka perkiraan. Indikator perjalanan periode, detail email/jurusan, edit profil, serta pembesaran foto tetap tersedia.
 
 ## 5. Struktur Data Utama
 
-Kalender dan grafik membaca tabel `attendance` yang sudah ada dan mengikuti hak akses pengguna; tidak memerlukan migrasi database baru. Data diperbarui melalui Supabase Realtime. Kalender memakai warna status yang kontras. Minggu ditandai **Libur** dengan warna khusus, sedangkan Sabtu tanpa catatan ditandai **Masuk opsional**. Senin?Jumat yang sudah lewat atau hari ini tanpa catatan dalam masa magang ditandai **Belum Absen**, bukan otomatis **Alpa**. Catatan absensi yang sudah tersimpan pada akhir pekan tetap dapat dilihat. Grafik menghitung catatan harian per status, dengan Hadir dan Terlambat terpisah, dan tidak menghitung tanggal mendatang. Tampilan mingguan menggunakan Senin–Minggu, sedangkan tampilan bulanan menampilkan setiap tanggal dalam bulan yang dipilih. Tanggal dan waktu absensi mengikuti WIB.
+Kalender dan grafik membaca tabel `attendance` yang sudah ada dan mengikuti hak akses pengguna; tidak memerlukan migrasi database baru. Data diperbarui melalui Supabase Realtime. Kalender memakai warna status yang kontras. Minggu ditandai **Libur** dengan warna khusus, sedangkan Sabtu saat absensi belum tercatat ditandai **Masuk opsional**. Senin–Jumat yang sudah lewat atau hari ini saat absensi belum tercatat dalam masa magang ditandai **Belum Absen**, bukan otomatis **Alpa**. Catatan absensi yang sudah tersimpan pada akhir pekan tetap dapat dilihat. Grafik menghitung catatan harian per status, dengan Hadir dan Terlambat terpisah, dan tidak menghitung tanggal mendatang. Tampilan mingguan menggunakan Senin–Minggu, sedangkan tampilan bulanan menampilkan setiap tanggal dalam bulan yang dipilih. Tanggal dan waktu absensi mengikuti WIB.
 
 ### `profiles`
 
@@ -96,6 +107,14 @@ Menyimpan token QR, status aktif, masa berlaku, koordinat lokasi, dan radius abs
 - Scan absensi diproses melalui fungsi SQL sehingga waktu, QR aktif, serta jarak lokasi dapat diverifikasi oleh server.
 
 ## 7. Responsivitas
+
+Header Monitoring, Laporan, Pengajuan, dan Pengaturan memakai pola yang sama: judul besar, deskripsi singkat, serta ikon dalam kotak hijau muda. Label Rawuh Pustaka dan garis dekoratif kecil memakai aksen emas; warna utama dan aksi tetap hijau. Pengajuan peserta juga mengikuti pola header ini.
+
+Kepala tabel memakai latar hijau lembut, garis pemisah tipis, serta sorotan baris saat diarahkan, ditekan, atau kontrol di dalamnya mendapat fokus. Nama peserta lebih tegas daripada universitas dan informasi pendukung. Grafik kehadiran memakai angka yang lebih besar, legenda tersusun dalam kartu, dan tiga garis bantu yang sejajar dengan nilai maksimum, tengah, dan nol pada sumbu. Rincian tanggal terpilih menampilkan total peserta dan hitungan tiap status; grafik bulanan tetap dapat digeser pada layar kecil.
+
+Tombol memberikan perubahan warna singkat saat diarahkan atau ditekan, tanpa pergeseran posisi. Formulir yang sedang diisi dan kontrol yang dipilih melalui keyboard memiliki penanda fokus hijau. Pembukaan detail memakai transisi ringan 160 milidetik; animasi dan transisi dalam aplikasi dinonaktifkan saat perangkat meminta pengurangan gerakan.
+
+Tampilan kosong memakai ikon dan pesan sesuai konteks, seperti **Belum ada absensi hari ini**, **Semua pengajuan sudah ditangani**, atau **Pengajuan tidak ditemukan** saat filter tidak cocok. Tombol Hapus filter, Buat pengajuan, Lihat riwayat pengajuan, dan Tambah anak magang tersedia sesuai kebutuhan. Pesan kosong tidak menggantikan indikator memuat atau kesalahan pengambilan data. Kartu pengajuan dan formulir menyesuaikan layar desktop maupun ponsel.
 
 Skeleton loading ditampilkan pada kartu ringkasan, daftar peserta/riwayat, laporan, dan grafik saat data dimuat. Animasi mengikuti preferensi perangkat untuk mengurangi gerakan. Laporan yang gagal dimuat menyediakan tombol coba lagi; ekspor dinonaktifkan hingga data periode yang dipilih berhasil dimuat.
 

@@ -4,6 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeSVG } from "qrcode.react";
 import InternDashboard from "./components/InternDashboard";
+import ParticipantProfile from "./components/ParticipantProfile";
+import PageHeading from "./components/PageHeading";
+import AdminDashboard from "./components/AdminDashboard";
+import PendingRequestBadge from "./components/PendingRequestBadge";
+import usePendingRequests from "./components/usePendingRequests";
+import useRequestReplies from "./components/useRequestReplies";
+import { jakartaToday } from "./attendanceVisuals";
 import AttendanceReports from "./components/AttendanceReports";
 import Skeleton from "./components/Skeleton";
 import { attendanceDisplayState, fetchAllPages } from "./attendanceSummary";
@@ -13,16 +20,18 @@ import PasswordInput from "./components/PasswordInput";
 import WebsiteLogo, { websiteLogoSrc } from "./components/WebsiteLogo";
 import BrandName from "./components/BrandName";
 import LeaveRequestReminder from "./components/LeaveRequestReminder";
+import RequestCard from "./components/RequestCard";
+import EmptyState from "./components/EmptyState";
 import AttendanceSuccess from "./components/AttendanceSuccess";
 import LoginFeedback from "./components/LoginFeedback";
 import AttendanceTable from "./components/AttendanceTable";
 import AttendanceCards from "./components/AttendanceCards";
 import StatusBadge from "./components/StatusBadge";
 import AttendanceCalendar from "./components/AttendanceCalendar";
-import AttendanceTrend from "./components/AttendanceTrend";
 import { loginErrorMessage } from "./loginErrorMessage";
 import {
   AlertCircle,
+  CheckCircle2,
   Bell,
   CalendarDays,
   Camera,
@@ -47,6 +56,8 @@ import {
   X,
 } from "lucide-react";
 import "./styles.css";
+import "./interactions.css";
+import "./tablePresentation.css";
 
 const cfg = {
   url: import.meta.env.VITE_SUPABASE_URL,
@@ -144,7 +155,7 @@ const getDemoRows = () => {
         out: "-",
         status: "Belum Absen",
       }))
-    : sampleRows;
+    : sampleRows.map((row, index) => ({ ...row, id: `demo-${index}`, is_active: true }));
 };
 const getTime = () =>
   new Intl.DateTimeFormat("id-ID", {
@@ -237,6 +248,11 @@ function App() {
   const [page, setPage] = useState("dashboard");
   const [toast, setToast] = useState(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  const pendingRequests = usePendingRequests(
+    supabase,
+    user?.role === "admin" ? user.id : null,
+  );
+  const requestReplies = useRequestReplies(supabase, user?.role === "intern" ? user.id : null);
   const [attendance, setAttendance] = useState(() =>
     JSON.parse(localStorage.getItem("magang-attendance") || "[]"),
   );
@@ -339,10 +355,12 @@ function App() {
       .filter((item) => !item.read_at)
       .map((item) => item.id);
     if (supabase && unread.length) {
-      await supabase
+      const { error } = await supabase
         .from("notifications")
         .update({ read_at: new Date().toISOString() })
         .in("id", unread);
+      if (error) return flash("Notifikasi belum dapat ditandai dibaca. Silakan coba lagi.", "error");
+      requestReplies.refresh();
       setNotifications((items) =>
         items.map((item) => ({
           ...item,
@@ -403,12 +421,13 @@ function App() {
         ];
   const content =
     user.role === "admin" ? (
-      <AdminPage page={page} nav={setPage} flash={flash} />
+      <AdminPage page={page} nav={setPage} flash={flash} pendingRequests={pendingRequests} />
     ) : (
       <InternPage
         page={page}
         nav={setPage}
         user={user}
+        requestReplies={requestReplies}
         attendance={attendance}
         setAttendance={setAttendance}
         flash={flash}
@@ -433,6 +452,12 @@ function App() {
           >
             <Icon size={19} />
             {label}
+            {user.role === "admin" && id === "requests" && (
+              <PendingRequestBadge count={pendingRequests.count} />
+            )}
+            {user.role === "intern" && id === "leave" && (
+              <PendingRequestBadge count={requestReplies.count} label="balasan pengajuan belum dibaca" />
+            )}
           </button>
         ))}
         <div className="side-bottom">
@@ -506,6 +531,12 @@ function App() {
             key={id}
           >
             <Icon size={nav.length > 5 ? 17 : 20} />
+            {user.role === "admin" && id === "requests" && (
+              <PendingRequestBadge count={pendingRequests.count} />
+            )}
+            {user.role === "intern" && id === "leave" && (
+              <PendingRequestBadge count={requestReplies.count} label="balasan pengajuan belum dibaca" />
+            )}
             <span>{label}</span>
           </button>
         ))}
@@ -901,6 +932,7 @@ function InternPage({
   setAttendance,
   flash,
   updateUser,
+  requestReplies,
 }) {
   const record = attendance.find((x) => x.date === today);
   const [scanSuccess, setScanSuccess] = useState(null);
@@ -1012,7 +1044,7 @@ function InternPage({
   } else if (page === "history") {
     content = <History data={attendance} user={user} loading={attendanceLoading} loadError={attendanceError} />;
   } else if (page === "leave") {
-    content = <LeaveRequests user={user} flash={flash} />;
+    content = <LeaveRequests user={user} flash={flash} requestReplies={requestReplies} />;
   } else if (page === "profile") {
     content = <Profile user={user} updateUser={updateUser} />;
   } else {
@@ -1274,11 +1306,11 @@ function History({ data, user, loading = false, loadError = "" }) {
             </table>
           </>
         ) : (
-          <p className="empty-state">
-            {data.length
-              ? "Tidak ada riwayat sesuai filter."
-              : "Belum ada riwayat absensi."}
-          </p>
+          <EmptyState icon={historyDate || historyMonth || historyStatus !== "Semua" ? Search : CalendarDays}
+            title={historyDate || historyMonth || historyStatus !== "Semua" ? "Absensi tidak ditemukan" : "Belum ada riwayat absensi"}
+            description="Catatan kehadiran Anda akan tampil di sini. Jika memakai filter, coba pilih tanggal atau status lain."
+            actionLabel={historyDate || historyMonth || historyStatus !== "Semua" ? "Hapus filter" : undefined}
+            onAction={() => { setHistoryDate(""); setHistoryMonth(""); setHistoryStatus("Semua"); }} />
         )}
       </div>
     </>
@@ -1356,66 +1388,8 @@ function Profile({ user, updateUser }) {
     setOpen(false);
   };
   return (
-    <div className="profile-grid">
-      <div className="panel profile-card">
-        {profile.photo_url ? (
-          <button
-            type="button"
-            className="profile-photo-button"
-            onClick={() => setViewingPhoto(true)}
-            aria-label="Lihat foto profil ukuran besar"
-          >
-            <img className="profile-photo" src={profile.photo_url} alt="" />
-          </button>
-        ) : (
-          <div className="avatar xl">{profile.initials}</div>
-        )}
-        <h2>{profile.name}</h2>
-        <p>Anak Magang · {profile.university || "-"}</p>
-        <span className="badge green">Aktif</span>
-        <hr />
-        <div>
-          <small>EMAIL</small>
-          <b>{profile.email || "-"}</b>
-        </div>
-        <div>
-          <small>UNIVERSITAS</small>
-          <b>{profile.university || "-"}</b>
-        </div>
-        <div>
-          <small>JURUSAN</small>
-          <b>{profile.major || "-"}</b>
-        </div>
-      </div>
-      <div className="panel detail-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Informasi Magang</h2>
-            <p>Data pribadi dan penempatan</p>
-          </div>
-          <button className="text-btn" onClick={() => setOpen(true)}>
-            Edit profil
-          </button>
-        </div>
-        {[
-          [
-            "Tanggal mulai",
-            profile.internship_start
-              ? formatDate(profile.internship_start)
-              : "-",
-          ],
-          [
-            "Tanggal selesai",
-            profile.internship_end ? formatDate(profile.internship_end) : "-",
-          ],
-          ["Status akun", profile.is_active ? "Aktif" : "Nonaktif"],
-        ].map((x) => (
-          <div className="info-row" key={x[0]}>
-            <span>{x[0]}</span>
-            <b>{x[1]}</b>
-          </div>
-        ))}
-      </div>
+    <div className="participant-profile-page">
+      <ParticipantProfile profile={profile} onEdit={() => setOpen(true)} onViewPhoto={() => setViewingPhoto(true)} />
       {open && (
         <div className="modal-backdrop">
           <form className="modal profile-edit-modal" onSubmit={submit}>
@@ -1470,121 +1444,164 @@ function Profile({ user, updateUser }) {
     </div>
   );
 }
-function AdminPage({ page, nav, flash }) {
-  const [rows, setRows] = useState(supabase ? [] : getDemoRows()),
-    [loading, setLoading] = useState(!!supabase),
-    [loadError, setLoadError] = useState(""),
-    [attendanceDate, setAttendanceDate] = useState(today);
-  const load = async (selectedDate = attendanceDate) => {
-    if (!supabase) {
-      setRows(getDemoRows());
-      return;
-    }
-    setLoading(true);
-    setLoadError("");
-    const [
-      { data: profiles, error: profileError },
-      { data: attendances, error: attendanceError },
-      { data: settingsRow },
-    ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select(
-          "id,name,email,role,photo_url,university,major,internship_start,internship_end,is_active",
-        )
-        .order("name"),
-      supabase
-        .from("attendance")
-        .select("user_id,check_in,check_out,status")
-        .eq("date", selectedDate),
-      supabase
-        .from("system_settings")
-        .select("work_end_time")
-        .eq("id", 1)
-        .maybeSingle(),
-    ]);
-    if (profileError || attendanceError) {
-      const message = (profileError || attendanceError).message;
-      setLoadError(message);
-      flash(message, "error");
-      setLoading(false);
-      return;
-    }
-    const workEndTime = settingsRow?.work_end_time
-      ? String(settingsRow.work_end_time).slice(0, 5)
-      : null;
-    const byUser = new Map((attendances || []).map((a) => [a.user_id, a]));
-    setRows(
-      await Promise.all(
-        // Jangan membatasi query dengan role di database. Data lama bisa saja
-        // belum memiliki role "intern", tetapi tetap perlu terlihat di admin.
-        (profiles || [])
-          .filter((p) => p.role !== "admin")
-          .map(async (p) => {
-          const a = byUser.get(p.id);
-          const signedPhotoUrl = await getSignedPhotoUrl(p.photo_url);
-          return {
-            id: p.id,
-            name: p.name,
-            email: p.email,
-            photo_url: signedPhotoUrl,
-            internship_start: p.internship_start,
-            internship_end: p.internship_end,
-            initials: p.name
-              .split(" ")
-              .map((x) => x[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase(),
-            university: p.university || "",
-            major: p.major || "",
-            in: formatTime(a?.check_in),
-            out: formatTime(a?.check_out),
-            checkoutPending: Boolean(a?.check_in && !a?.check_out),
-            checkoutEarly: Boolean(
-              a?.check_out &&
-                workEndTime &&
-                timeOfDayJakarta(a.check_out) < workEndTime,
-            ),
-            is_active: p.is_active,
-            status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
-          };
-          }),
-      ),
-    );
-    setLoading(false);
-  };
+function AdminPage({ page, nav, flash, pendingRequests }) {
+  const [now, setNow] = useState(() => new Date());
+  const currentToday = jakartaToday(now);
+  const [rows, setRows] = useState(() => (supabase ? [] : getDemoRows()));
+  const [loading, setLoading] = useState(!!supabase);
+  const [loadError, setLoadError] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(currentToday);
+  const [loadedDate, setLoadedDate] = useState(null);
+  const [workEndTime, setWorkEndTime] = useState(() =>
+    supabase ? null : getWorkEndTime(),
+  );
+  const selectedDate = page === "monitor" ? attendanceDate : currentToday;
+  const sequence = useRef(0);
+  const controller = useRef(null);
+  const load = useCallback(
+    async (date = selectedDate) => {
+      const request = ++sequence.current;
+      controller.current?.abort();
+      if (!supabase) {
+        setRows(getDemoRows());
+        setWorkEndTime(getWorkEndTime());
+        setLoadedDate(date);
+        return;
+      }
+      const abort = new AbortController();
+      controller.current = abort;
+      setLoading(true);
+      setLoadError("");
+      try {
+        const [profiles, attendances, settingsResult] = await Promise.all([
+          fetchAllPages(
+            () =>
+              supabase
+                .from("profiles")
+                .select(
+                  "id,name,email,role,photo_url,university,major,internship_start,internship_end,is_active",
+                )
+                .order("name")
+                .order("id"),
+            abort.signal,
+          ),
+          fetchAllPages(
+            () =>
+              supabase
+                .from("attendance")
+                .select("user_id,check_in,check_out,status")
+                .eq("date", date)
+                .order("user_id"),
+            abort.signal,
+          ),
+          supabase
+            .from("system_settings")
+            .select("work_end_time")
+            .eq("id", 1)
+            .maybeSingle()
+            .abortSignal(abort.signal),
+        ]);
+        const endTime =
+          !settingsResult.error && settingsResult.data?.work_end_time
+            ? String(settingsResult.data.work_end_time).slice(0, 5)
+            : null;
+        const byUser = new Map(attendances.map((a) => [a.user_id, a]));
+        // Keep legacy non-admin profiles visible, as in the participant list.
+        const nextRows = await Promise.all(
+          profiles
+            .filter((p) => p.role !== "admin")
+            .map(async (p) => {
+              const a = byUser.get(p.id);
+              return {
+                ...p,
+                photo_url: await getSignedPhotoUrl(p.photo_url),
+                initials: p.name
+                  .split(" ")
+                  .map((x) => x[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase(),
+                university: p.university || "",
+                major: p.major || "",
+                check_in: a?.check_in || null,
+                check_out: a?.check_out || null,
+                in: formatTime(a?.check_in),
+                out: formatTime(a?.check_out),
+                checkoutPending: Boolean(a?.check_in && !a?.check_out),
+                checkoutEarly: Boolean(
+                  a?.check_out &&
+                  endTime &&
+                  timeOfDayJakarta(a.check_out) < endTime,
+                ),
+                status: a?.status || (p.is_active ? "Belum Absen" : "Nonaktif"),
+              };
+            }),
+        );
+        if (request !== sequence.current || abort.signal.aborted) return;
+        setRows(nextRows);
+        setWorkEndTime(endTime);
+        setLoadedDate(date);
+      } catch (error) {
+        if (request !== sequence.current || abort.signal.aborted) return;
+        setLoadError(error.message || "Data admin belum dapat dimuat.");
+      } finally {
+        if (request === sequence.current && !abort.signal.aborted)
+          setLoading(false);
+      }
+    },
+    [selectedDate],
+  );
   useEffect(() => {
-    load(attendanceDate);
-    if (!supabase) return;
+    const tick = () => setNow(new Date());
+    const timer = window.setInterval(tick, 15000);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", tick);
+    };
+  }, []);
+  useEffect(() => {
+    load();
     const channel = supabase
-      .channel("admin-live-attendance")
+      ?.channel("admin-live-attendance")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "attendance" },
-        () => load(attendanceDate),
+        () => load(),
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles" },
-        () => load(attendanceDate),
+        () => load(),
       )
       .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [attendanceDate]);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const timer = window.setInterval(onVisible, 30000);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      sequence.current++;
+      controller.current?.abort();
+      clearInterval(timer);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [load]);
   useEffect(() => {
-    if (page !== "monitor" && attendanceDate !== today) {
-      setAttendanceDate(today);
-    }
-  }, [page, attendanceDate]);
+    if (page !== "monitor") setAttendanceDate(currentToday);
+  }, [page, currentToday]);
+  const dataLoading = loading || (!loadError && loadedDate !== selectedDate);
   if (page === "qr") return <QrGenerator flash={flash} />;
   if (page === "monitor")
     return (
       <Monitoring
         rows={rows}
-        loading={loading}
+        loading={dataLoading}
         loadError={loadError}
-        onRetry={() => load(attendanceDate)}
+        onRetry={() => load()}
         attendanceDate={attendanceDate}
         onAttendanceDateChange={setAttendanceDate}
       />
@@ -1593,9 +1610,9 @@ function AdminPage({ page, nav, flash }) {
     return (
       <Interns
         rows={rows}
-        loading={loading}
+        loading={dataLoading}
         loadError={loadError}
-        onRetry={() => load(today)}
+        onRetry={() => load()}
         refresh={load}
         flash={flash}
       />
@@ -1604,56 +1621,27 @@ function AdminPage({ page, nav, flash }) {
     return (
       <AdminWorkflows
         rows={rows}
-        refresh={(selectedDate) => {
-          if (selectedDate) setAttendanceDate(selectedDate);
-          load(selectedDate || attendanceDate);
-        }}
+        pendingRequests={pendingRequests}
+        refresh={() => load()}
         flash={flash}
       />
     );
-  if (page === "reports") return <AttendanceReports client={supabase} flash={flash} />;
+  if (page === "reports")
+    return <AttendanceReports client={supabase} flash={flash} />;
   if (page === "settings") return <SettingsPage />;
-  return <AdminDashboard rows={rows} nav={nav} loading={loading} />;
-}
-function AdminDashboard({ rows, nav, loading }) {
-  const present = rows.filter((x) => x.in !== "-"),
-    late = rows.filter((x) => x.status === "Terlambat"),
-    absent = rows.filter((x) => x.status === "Belum Absen");
-  const stats = [
-    [String(rows.length), "Total Anak Magang", Users, "blue"],
-    [String(present.length), "Hadir Hari Ini", Check, "green"],
-    [String(absent.length), "Belum Absen", Clock3, "orange"],
-    [String(late.length), "Terlambat", Bell, "red"],
-  ];
   return (
-    <>
-      {loading ? <Skeleton variant="cards" label="Memuat ringkasan admin..." /> : <section className="stat-grid">
-        {stats.map(([n, l, I, c]) => (
-          <div className="stat-card" key={l}>
-            <span className={"stat-icon " + c}>
-              <I size={20} />
-            </span>
-            <div>
-              <b>{loading ? "…" : n}</b>
-              <small>{l}</small>
-            </div>
-          </div>
-        ))}
-      </section>}
-      <AttendanceTrend client={supabase} />
-      <section className="panel table-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Absensi Hari Ini</h2>
-            <p>{formatDate(today)} · data langsung dari Supabase</p>
-          </div>
-          <button className="text-btn" onClick={() => nav("monitor")}>
-            Lihat monitoring
-          </button>
-        </div>
-        <AttendanceTable rows={rows} loading={loading} />
-      </section>
-    </>
+    <AdminDashboard
+      rows={rows}
+      nav={nav}
+      loading={dataLoading}
+      error={loadError}
+      onRetry={() => load()}
+      client={supabase}
+      now={now}
+      today={currentToday}
+      workEndTime={workEndTime}
+      pendingRequests={pendingRequests}
+    />
   );
 }
 function TablePagination({ page, totalItems, pageSize = 10, onChange }) {
@@ -1894,16 +1882,9 @@ function Monitoring({
   useEffect(() => setCurrentPage(1), [q, statusFilter, attendanceDate]);
   return (
     <div className="panel table-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Monitoring Absensi</h2>
-          <p>
-            {loading
-              ? "Memuat data..."
-              : "Pembaruan otomatis saat absensi masuk."}
-          </p>
-        </div>
-        <label className="filter">
+      <PageHeading icon={CalendarDays} title="Monitoring Absensi"
+        description="Pantau kehadiran, jam masuk, dan jam pulang peserta setiap hari."
+        actions={<label className="filter">
           <CalendarDays size={16} />
           <span className="sr-only">Pilih tanggal absensi</span>
           <input
@@ -1913,8 +1894,7 @@ function Monitoring({
             onChange={(event) => onAttendanceDateChange(event.target.value)}
             aria-label="Pilih tanggal absensi"
           />
-        </label>
-      </div>
+        </label>} />
       <DataLoadError message={loadError} loading={loading} onRetry={onRetry} />
       <div className="history-filters" aria-label="Filter monitoring absensi">
         <div className="search">
@@ -1937,7 +1917,10 @@ function Monitoring({
           <option value="attended">Sudah Absen</option>
         </select>
       </div>
-      <AttendanceTable rows={visibleRows} loading={loading} />
+      {!loadError && <AttendanceTable rows={visibleRows} loading={loading} emptyState={q || statusFilter !== "all" ? {
+        icon: Search, title: "Peserta tidak ditemukan", description: "Coba gunakan nama atau status lain untuk melihat data peserta.",
+        actionLabel: "Hapus filter", onAction: () => { setQ(""); setStatusFilter("all"); },
+      } : undefined} />}
       <TablePagination
         page={activePage}
         totalItems={filtered.length}
@@ -2178,7 +2161,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
           <option value="Selesai">Sudah selesai</option>
         </select>
       </div>
-      <AttendanceTable
+      {!loadError && <AttendanceTable
         loading={loading}
         rows={visibleRows}
         onHistory={setViewingHistory}
@@ -2187,7 +2170,11 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         onToggleActive={toggleActive}
         onPhotoClick={setViewingPhoto}
         showAttendance={false}
-      />
+        emptyState={query || durationFilter !== "Semua" ? {
+          icon: Search, title: "Peserta tidak ditemukan", description: "Coba ubah nama, universitas, atau filter masa magang.",
+          actionLabel: "Hapus filter", onAction: () => { setQuery(""); setDurationFilter("Semua"); },
+        } : { actionLabel: "Tambah anak magang", onAction: () => { setEditing(null); setOpen(true); } }}
+      />}
       <TablePagination
         page={activePage}
         totalItems={filteredRows.length}
@@ -2607,42 +2594,65 @@ function BulkImportModal({ onClose, refresh, flash }) {
     </div>
   );
 }
-function LeaveRequests({ user, flash }) {
+function LeaveRequests({ user, flash, requestReplies }) {
   const [requests, setRequests] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(!!supabase);
+  const formRef = useRef(null);
   const [type, setType] = useState("Izin");
   const [historyStatus, setHistoryStatus] = useState("Semua");
   const [historyType, setHistoryType] = useState("Semua");
   const [historyDate, setHistoryDate] = useState("");
   const [historyMonth, setHistoryMonth] = useState("");
-  const load = async () => {
+  const [loadedReplyIds, setLoadedReplyIds] = useState([]);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
+  const load = useCallback(async () => {
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from("leave_requests")
-      .select("id,type,date_from,date_to,reason,status,rejection_reason,created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) flash(error.message, "error");
-    else setRequests(data || []);
-  };
+    const sequence = ++loadSequence.current;
+    const replyIds = requestReplies.ids;
+    try {
+      const data = await fetchAllPages(() => supabase
+        .from("leave_requests")
+        .select("id,type,date_from,date_to,reason,status,rejection_reason,created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }).order("id"));
+      if (sequence !== loadSequence.current) return;
+      setRequests(data);
+      setLoadError("");
+      setLoadedReplyIds(replyIds);
+    } catch {
+      if (sequence !== loadSequence.current) return;
+      setLoadError("Riwayat pengajuan belum dapat dimuat. Silakan coba lagi.");
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
+  }, [user.id, requestReplies.ids]);
   useEffect(() => {
     load();
     if (!supabase) return;
     const channel = supabase
       .channel(`leave-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "leave_requests",
-          filter: `user_id=eq.${user.id}`,
-        },
-        load,
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [user.id]);
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "leave_requests",
+        filter: `user_id=eq.${user.id}`,
+      }, load).subscribe();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      loadSequence.current++;
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      supabase.removeChannel(channel);
+    };
+  }, [user.id, load]);
+  useEffect(() => {
+    if (!loadError && document.visibilityState === "visible" &&
+      historyStatus === "Semua" && historyType === "Semua" && !historyDate && !historyMonth) {
+      requestReplies.markRead(loadedReplyIds);
+    }
+  }, [loadedReplyIds, loadError, historyStatus, historyType, historyDate, historyMonth, requestReplies.markRead]);
   const submit = async (event) => {
     event.preventDefault();
     if (!supabase)
@@ -2675,10 +2685,14 @@ function LeaveRequests({ user, flash }) {
       : !historyMonth || item.date_from.startsWith(historyMonth);
     return matchesStatus && matchesType && matchesPeriod;
   });
+  const hasHistoryFilters = Boolean(historyDate || historyMonth || historyStatus !== "Semua" || historyType !== "Semua");
+  const resetHistoryFilters = () => { setHistoryDate(""); setHistoryMonth(""); setHistoryStatus("Semua"); setHistoryType("Semua"); };
   return (
-    <div className="workflow-grid">
-      <form className="panel settings" onSubmit={submit}>
+    <div className="workflow-grid request-page">
+      <div className="panel request-page-heading"><PageHeading icon={FileText} title="Pengajuan Peserta" description="Ajukan izin, sakit, atau lupa absen dan lihat balasan pembimbing." /></div>
+      <form className="panel settings" onSubmit={submit} ref={formRef}>
         <h2>Ajukan izin, sakit, atau lupa absen</h2>
+        <p className="request-panel-intro">Sampaikan kebutuhan Anda. Balasan pembimbing akan tampil di riwayat pengajuan.</p>
         <label>
           Jenis
           <select
@@ -2728,6 +2742,9 @@ function LeaveRequests({ user, flash }) {
       </form>
       <div className="panel">
         <h2>Riwayat pengajuan</h2>
+        {loadError && <div className="data-load-error" role="alert">
+          <span>{loadError}</span><button className="outline" onClick={load}>Coba lagi</button>
+        </div>}
         <div className="history-filters">
           <input
             type="date"
@@ -2747,48 +2764,37 @@ function LeaveRequests({ user, flash }) {
             }}
             aria-label="Filter bulan pengajuan"
           />
-          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
+          <select aria-label="Filter jenis pengajuan" value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
             <option>Semua</option><option>Izin</option><option>Sakit</option><option>Lupa Absen</option>
           </select>
-          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
+          <select aria-label="Filter status pengajuan" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
             <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
           </select>
         </div>
-        {historyRequests.length ? (
-          historyRequests.map((item) => (
-            <div className="workflow-item" key={item.id}>
-              <div className="leave-request-details">
-                <b>{item.type}</b>
-                <p>
-                  {item.date_from === item.date_to
-                    ? formatDate(item.date_from)
-                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
-                </p>
-                <small>{item.reason}</small>
-                {item.status === "Ditolak" && item.rejection_reason && (
-                  <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>
-                )}
-                <LeaveRequestReminder request={item} />
-              </div>
-              <span
-                className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}
-              >
-                {item.status}
-              </span>
-            </div>
-          ))
+        {loading ? <Skeleton variant="table" label="Memuat riwayat pengajuan..." /> : !loadError && (historyRequests.length ? (
+          <div className="request-list">{historyRequests.map((item) => (
+            <RequestCard key={item.id} request={item} name={user.name || "Pengajuan Anda"}>
+              <LeaveRequestReminder request={item} />
+            </RequestCard>
+          ))}</div>
         ) : (
-          <p className="empty-state">
-            {requests.length ? "Tidak ada pengajuan sesuai filter." : "Belum ada pengajuan."}
-          </p>
-        )}
+          <EmptyState icon={hasHistoryFilters ? Search : FileText}
+            title={hasHistoryFilters ? "Pengajuan tidak ditemukan" : "Belum ada pengajuan"}
+            description={hasHistoryFilters ? "Coba ubah atau hapus filter untuk melihat pengajuan lainnya." : "Pengajuan izin, sakit, dan lupa absen beserta balasannya akan muncul di sini."}
+            actionLabel={hasHistoryFilters ? "Hapus filter" : "Buat pengajuan"}
+            onAction={hasHistoryFilters ? resetHistoryFilters : () => { formRef.current?.scrollIntoView({ block: "center" }); formRef.current?.querySelector("select")?.focus({ preventScroll: true }); }} />
+        ))}
       </div>
     </div>
   );
 }
 
-function AdminWorkflows({ rows, refresh, flash }) {
+function AdminWorkflows({ rows, refresh, flash, pendingRequests }) {
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(!!supabase);
+  const [loadError, setLoadError] = useState("");
+  const [reviewing, setReviewing] = useState(null);
+  const loadSequence = useRef(0);
   const [rejecting, setRejecting] = useState(null);
   const [historyStatus, setHistoryStatus] = useState("Semua");
   const [historyType, setHistoryType] = useState("Semua");
@@ -2796,25 +2802,41 @@ function AdminWorkflows({ rows, refresh, flash }) {
   const [historyMonth, setHistoryMonth] = useState("");
   const load = async () => {
     if (!supabase) return;
-    const { data: leaveData, error } = await supabase
-      .from("leave_requests")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) flash(error.message, "error");
-    setRequests(leaveData || []);
+    const sequence = ++loadSequence.current;
+    try {
+      const data = await fetchAllPages(() => supabase.from("leave_requests").select("*").order("created_at", { ascending: false }).order("id"));
+      if (sequence !== loadSequence.current) return;
+      setRequests(data);
+      setLoadError("");
+    } catch {
+      if (sequence === loadSequence.current) setLoadError("Pengajuan belum dapat dimuat. Silakan coba lagi.");
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
   };
   useEffect(() => {
     load();
-  }, []);
+    return () => { loadSequence.current++; };
+  }, [pendingRequests.updatedAt]);
   const review = async (id, decision, rejectionNote = null) => {
-    const { error } = await supabase.rpc("review_leave_request", {
-      request_id: id,
-      decision,
-      rejection_note: rejectionNote,
-    });
-    if (error) return flash(error.message, "error");
-    flash(`Pengajuan ${decision.toLowerCase()}.`);
-    load();
+    if (reviewing) return false;
+    setReviewing(id);
+    try {
+      const { error } = await supabase.rpc("review_leave_request", {
+        request_id: id, decision, rejection_note: rejectionNote,
+      });
+      if (error) throw error;
+      flash(`Pengajuan ${decision.toLowerCase()}.`);
+      load();
+      pendingRequests.refresh();
+      refresh();
+      return true;
+    } catch (error) {
+      flash(error.message || "Pengajuan belum dapat diproses.", "error");
+      return false;
+    } finally {
+      setReviewing(null);
+    }
   };
   const remind = async () => {
     const { data, error } = await supabase.rpc("generate_absence_reminders");
@@ -2849,8 +2871,12 @@ function AdminWorkflows({ rows, refresh, flash }) {
       : !historyMonth || item.date_from.startsWith(historyMonth);
     return matchesStatus && matchesType && matchesPeriod;
   });
+  const waitingRequests = requests.filter((item) => item.status === "Menunggu");
+  const hasHistoryFilters = Boolean(historyDate || historyMonth || historyStatus !== "Semua" || historyType !== "Semua");
+  const resetHistoryFilters = () => { setHistoryDate(""); setHistoryMonth(""); setHistoryStatus("Semua"); setHistoryType("Semua"); };
   return (
-    <div className="admin-workflows">
+    <div className="admin-workflows request-page">
+      <div className="panel request-page-heading"><PageHeading icon={FileText} title="Kelola Pengajuan" description="Tinjau pengajuan peserta dan kelola koreksi absensi dalam satu tempat." /></div>
       <div className="panel">
         <div className="section-head">
           <div>
@@ -2861,47 +2887,20 @@ function AdminWorkflows({ rows, refresh, flash }) {
             <Bell size={16} /> Kirim pengingat
           </button>
         </div>
-        {requests.length ? (
-          requests.map((item) => (
-            <div className="workflow-item" key={item.id}>
-              <div>
-                <b>
-                  {nameOf(item.user_id)} · {item.type}
-                </b>
-                <p>
-                  {item.date_from === item.date_to
-                    ? formatDate(item.date_from)
-                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
-                </p>
-                <small>{item.reason}</small>
-              </div>
-              {item.status === "Menunggu" ? (
-                <div className="workflow-actions">
-                  <button
-                    className="outline"
-                    onClick={() => setRejecting(item)}
-                  >
-                    Tolak
-                  </button>
-                  <button
-                    className="primary"
-                    onClick={() => review(item.id, "Disetujui")}
-                  >
-                    Setujui
-                  </button>
-                </div>
-              ) : (
-                <span
-                  className={`badge ${item.status === "Disetujui" ? "green" : "red"}`}
-                >
-                  {item.status}
-                </span>
-              )}
-            </div>
-          ))
+        {loadError && <DataLoadError message={loadError} loading={loading} onRetry={load} />}
+        {loading ? <Skeleton variant="table" label="Memuat pengajuan menunggu..." /> : !loadError && (waitingRequests.length ? (
+          <div className="request-list">{waitingRequests.map((item) => (
+            <RequestCard key={item.id} request={item} name={nameOf(item.user_id)} actions={<>
+              <button className="outline request-reject-button" disabled={Boolean(reviewing)} onClick={() => setRejecting(item)}><X size={16} /> Tolak</button>
+              <button className="primary" disabled={Boolean(reviewing)} onClick={() => review(item.id, "Disetujui")}><Check size={16} /> {reviewing === item.id ? "Memproses..." : "Setujui"}</button>
+            </>} />
+          ))}</div>
         ) : (
-          <p className="empty-state">Belum ada pengajuan.</p>
-        )}
+          <EmptyState icon={CheckCircle2} title="Semua pengajuan sudah ditangani"
+            description="Tidak ada pengajuan yang menunggu persetujuan. Pengajuan baru akan muncul di sini."
+            actionLabel={requests.length ? "Lihat riwayat pengajuan" : undefined}
+            onAction={() => { resetHistoryFilters(); document.getElementById("admin-request-history")?.focus(); }} />
+        ))}
       </div>
       <form className="panel settings" onSubmit={correct}>
         <h2>Koreksi absensi</h2>
@@ -2947,7 +2946,7 @@ function AdminWorkflows({ rows, refresh, flash }) {
         </label>
         <button className="primary">Simpan koreksi</button>
       </form>
-      <div className="panel audit-panel">
+      <div className="panel audit-panel" id="admin-request-history" tabIndex={-1}>
         <div className="section-head">
           <div>
             <h2>Riwayat pengajuan</h2>
@@ -2973,33 +2972,22 @@ function AdminWorkflows({ rows, refresh, flash }) {
             }}
             aria-label="Filter bulan pengajuan"
           />
-          <select value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
+          <select aria-label="Filter jenis pengajuan" value={historyType} onChange={(event) => setHistoryType(event.target.value)}>
             <option>Semua</option><option>Izin</option><option>Sakit</option><option>Lupa Absen</option>
           </select>
-          <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
+          <select aria-label="Filter status pengajuan" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value)}>
             <option>Semua</option><option>Menunggu</option><option>Disetujui</option><option>Ditolak</option>
           </select>
         </div>
-        {historyRequests.length ? (
-          historyRequests.map((item) => (
-            <div className="workflow-item" key={item.id}>
-              <div>
-                <b>{nameOf(item.user_id)} · {item.type}</b>
-                <p>
-                  {item.date_from === item.date_to
-                    ? formatDate(item.date_from)
-                    : `${formatDate(item.date_from)} – ${formatDate(item.date_to)}`}
-                </p>
-                <small>{item.reason}</small>
-                {item.status === "Ditolak" && item.rejection_reason && <small className="rejection-reason">Alasan penolakan: {item.rejection_reason}</small>}
-              </div>
-              <span className={`badge ${item.status === "Disetujui" ? "green" : item.status === "Ditolak" ? "red" : "orange"}`}>
-                {item.status}
-              </span>
-            </div>
-          ))
+        {loading ? <Skeleton variant="table" label="Memuat riwayat pengajuan..." /> : loadError ? <DataLoadError message={loadError} loading={loading} onRetry={load} /> : historyRequests.length ? (
+          <div className="request-list request-history-list">{historyRequests.map((item) => (
+            <RequestCard key={item.id} request={item} name={nameOf(item.user_id)} />
+          ))}</div>
         ) : (
-          <p className="empty-state">Tidak ada pengajuan sesuai filter.</p>
+          <EmptyState icon={hasHistoryFilters ? Search : FileText}
+            title={hasHistoryFilters ? "Pengajuan tidak ditemukan" : "Belum ada riwayat pengajuan"}
+            description={hasHistoryFilters ? "Coba ubah atau hapus filter untuk melihat pengajuan lainnya." : "Pengajuan peserta dan keputusan pembimbing akan tersimpan di sini."}
+            actionLabel={hasHistoryFilters ? "Hapus filter" : undefined} onAction={resetHistoryFilters} />
         )}
       </div>
       {rejecting && (
@@ -3007,14 +2995,13 @@ function AdminWorkflows({ rows, refresh, flash }) {
           <form className="modal" onSubmit={async (event) => {
             event.preventDefault();
             const note = new FormData(event.currentTarget).get("rejection_reason");
-            await review(rejecting.id, "Ditolak", note);
-            setRejecting(null);
+            if (await review(rejecting.id, "Ditolak", note)) setRejecting(null);
           }}>
             <button type="button" className="modal-close" onClick={() => setRejecting(null)}><X size={18} /></button>
             <h2>Tolak pengajuan</h2>
             <p>Tulis alasan penolakan agar dapat dilihat oleh {nameOf(rejecting.user_id)}.</p>
             <label>Alasan penolakan<textarea name="rejection_reason" minLength="5" rows="4" required autoFocus /></label>
-            <button className="primary full">Kirim penolakan</button>
+            <button className="primary full" disabled={Boolean(reviewing)}>{reviewing ? "Mengirim..." : "Kirim penolakan"}</button>
           </form>
         </div>
       )}
@@ -3079,7 +3066,7 @@ function SettingsPage() {
   return (
     <>
       <form className="panel settings advanced-settings" onSubmit={save}>
-        <h2>Pengaturan Absensi</h2>
+        <PageHeading icon={Settings} title="Pengaturan Absensi" description="Atur jam kerja, toleransi keterlambatan, dan hari aktif absensi." />
         <p>Mengubah pengaturan tidak mengubah QR yang sudah dicetak.</p>
         <label>
           Jam masuk normal

@@ -1,0 +1,124 @@
+:root {
+  --rawuh-gold: #9b711e;
+  --rawuh-gold-soft: #dec68a;
+}
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding-bottom: 22px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e5ece7;
+}
+.page-heading-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.page-heading-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #d7eade;
+  border-radius: 15px;
+  background: #edf7f0;
+  color: #18774e;
+}
+.page-heading-copy {
+  min-width: 0;
+}
+.page-heading-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--rawuh-gold);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+.page-heading-brand::before {
+  content: "";
+  width: 17px;
+  height: 2px;
+  background: var(--rawuh-gold-soft);
+  border-radius: 2px;
+}
+.page-heading .page-heading-copy h2 {
+  color: #254435;
+  font-size: 27px;
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+  margin: 6px 0 8px;
+}
+.page-heading .page-heading-description {
+  color: #61766a;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 550px;
+}
+.page-heading-copy > .report-period {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.page-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  max-width: 100%;
+}
+.page-heading-actions > .filter {
+  margin: 0;
+  max-width: 100%;
+}
+.page-heading-actions input {
+  min-width: 0;
+  max-width: 100%;
+}
+.request-page > .request-page-heading {
+  grid-column: 1 / -1;
+}
+.request-page-heading .page-heading {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+@media (max-width: 640px) {
+  .page-heading {
+    gap: 16px;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+  }
+  .page-heading-identity {
+    gap: 11px;
+    flex-basis: 100%;
+  }
+  .page-heading-icon {
+    width: 43px;
+    height: 43px;
+    border-radius: 12px;
+  }
+  .page-heading-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .page-heading .page-heading-copy h2 {
+    font-size: 23px;
+  }
+  .page-heading-actions {
+    width: 100%;
+    padding-top: 0;
+  }
+  .page-heading-brand {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+}

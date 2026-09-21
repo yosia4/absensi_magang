@@ -139,11 +139,14 @@ export default function AttendanceTrend({ client }) {
         </div>
       ) : (
         <>
-          <div className="trend-totals">
+          <div
+            className="trend-totals"
+            aria-label="Ringkasan dan legenda status selama periode"
+          >
             {totals.map(({ name, tone, count }) => (
               <div key={name}>
                 <span>
-                  <i className={`visual-dot tone-${tone}`} />
+                  <i className={`visual-dot tone-${tone}`} aria-hidden="true" />
                   {name}
                 </span>
                 <b>{count}</b>
@@ -176,6 +179,11 @@ export default function AttendanceTrend({ client }) {
                 className={`trend-plot ${mode === "month" ? "is-month" : "is-week"}`}
                 aria-describedby="attendance-trend-help"
               >
+                <span className="trend-grid-lines" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
                 {days.map((day) => (
                   <button
                     type="button"
@@ -234,14 +242,19 @@ export default function AttendanceTrend({ client }) {
             </div>
           </div>
           <div className="trend-detail" aria-live="polite" aria-atomic="true">
-            <b>
-              {dateLabel(selectedDay.date, {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </b>
+            <div className="trend-detail-heading">
+              <b>
+                {dateLabel(selectedDay.date, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </b>
+              {selectedDay.date <= today && (
+                <span>{selectedDay.total} peserta</span>
+              )}
+            </div>
             {selectedDay.date > today ? (
               <p>Tanggal ini belum berlangsung.</p>
             ) : (
