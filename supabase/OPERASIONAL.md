@@ -43,6 +43,14 @@ supabase functions deploy update-own-profile
 
 Uji login admin, tambah anak magang, hapus anak magang, dan scan absensi setelah deploy.
 
+## Koreksi salah scan pulang
+
+Jalankan `supabase/migrations/013_clear_attendance_checkout.sql` pada database yang sudah digunakan. Migrasi menambahkan RPC khusus pembimbing aktif untuk mengosongkan jam pulang, tanpa mengubah jam masuk atau status. Tidak ada data absensi yang diubah saat migrasi dijalankan. Struktur RPC ini juga tercantum pada `schema.sql` untuk instalasi baru.
+
+Di **Kelola Pengajuan → Koreksi absensi**, pilih **Hapus absen pulang (salah scan dua kali)**, pilih peserta/tanggal, periksa catatan, isi alasan, dan konfirmasi. Operasi menolak data yang jam pulangnya berubah sejak dimuat. Riwayat audit menyimpan jam pulang sebelum penghapusan dan alasannya; peserta menerima notifikasi. Periksa bahwa peserta berstatus Hadir/Terlambat kembali dapat scan pulang setelah koreksi. Fitur ini memperbaiki catatan salah scan; alur scan otomatis masuk/pulang tetap mengikuti implementasi sebelumnya.
+
+Uji regresi lokal: `node --test tests/*.test.js`. Uji RPC pada PostgreSQL sementara: `node tests/clearCheckout.database.mjs`, dengan paket pengujian opsional `@electric-sql/pglite` tersedia (atau `PGLITE_MODULE` menunjuk URL modul yang dipasang terpisah). Uji tersebut tidak mengakses Supabase dan mencakup hak akses, penjagaan jam masuk/status, konfirmasi yang sudah kedaluwarsa, audit/notifikasi, dan rollback transaksi jika pencatatan gagal.
+
 ## Pemulihan jika terjadi masalah
 
 1. Hentikan sementara penggunaan aplikasi agar data tidak berubah.

@@ -15,6 +15,7 @@ import AttendanceReports from "./components/AttendanceReports";
 import Skeleton from "./components/Skeleton";
 import { attendanceDisplayState, fetchAllPages } from "./attendanceSummary";
 import ConfirmDialog from "./components/ConfirmDialog";
+import ClearCheckoutForm from "./components/ClearCheckoutForm";
 import NotificationPanel from "./components/NotificationPanel";
 import PasswordInput from "./components/PasswordInput";
 import WebsiteLogo, { websiteLogoSrc } from "./components/WebsiteLogo";
@@ -2790,6 +2791,9 @@ function LeaveRequests({ user, flash, requestReplies }) {
 }
 
 function AdminWorkflows({ rows, refresh, flash, pendingRequests }) {
+  const [correctionMode, setCorrectionMode] = useState("edit");
+  const [correcting, setCorrecting] = useState(false);
+  const correctionBusy = useRef(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(!!supabase);
   const [loadError, setLoadError] = useState("");
@@ -2846,19 +2850,31 @@ function AdminWorkflows({ rows, refresh, flash, pendingRequests }) {
   };
   const correct = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const { error } = await supabase.rpc("correct_attendance", {
-      target_user_id: form.get("user_id"),
-      target_date: form.get("date"),
-      new_check_in: form.get("check_in") || null,
-      new_check_out: form.get("check_out") || null,
-      new_status: form.get("status"),
-      correction_reason: form.get("reason"),
-    });
-    if (error) return flash(error.message, "error");
-    flash("Koreksi absensi berhasil disimpan.");
-    event.currentTarget.reset();
-    refresh(form.get("date"));
+    if (correctionBusy.current) return;
+    if (!supabase) return flash("Koreksi absensi memerlukan koneksi Supabase.", "error");
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    correctionBusy.current = true;
+    setCorrecting(true);
+    try {
+      const { error } = await supabase.rpc("correct_attendance", {
+        target_user_id: form.get("user_id"),
+        target_date: form.get("date"),
+        new_check_in: form.get("check_in") || null,
+        new_check_out: form.get("check_out") || null,
+        new_status: form.get("status"),
+        correction_reason: form.get("reason"),
+      });
+      if (error) throw error;
+      flash("Koreksi absensi berhasil disimpan.");
+      formElement.reset();
+      refresh(form.get("date"));
+    } catch (error) {
+      flash(error.message || "Koreksi absensi belum dapat disimpan.", "error");
+    } finally {
+      correctionBusy.current = false;
+      setCorrecting(false);
+    }
   };
   const nameOf = (id) =>
     rows.find((row) => row.id === id)?.name || "Anak magang";
@@ -2902,9 +2918,19 @@ function AdminWorkflows({ rows, refresh, flash, pendingRequests }) {
             onAction={() => { resetHistoryFilters(); document.getElementById("admin-request-history")?.focus(); }} />
         ))}
       </div>
-      <form className="panel settings" onSubmit={correct}>
+      <section className="panel settings attendance-correction">
         <h2>Koreksi absensi</h2>
         <p>Perbaiki jam masuk, jam pulang, atau status absensi anak magang.</p>
+        <label>
+          Jenis koreksi
+          <select value={correctionMode} disabled={correcting} onChange={(event) => setCorrectionMode(event.target.value)}>
+            <option value="edit">Koreksi jam / status</option>
+            <option value="clear-checkout">Hapus absen pulang (salah scan dua kali)</option>
+          </select>
+        </label>
+        {correctionMode === "clear-checkout" ? (
+          <ClearCheckoutForm client={supabase} rows={rows} flash={flash} onSaved={refresh} onBusyChange={setCorrecting} />
+        ) : <form onSubmit={correct}>
         <label>
           Anak magang
           <select name="user_id" required>
@@ -2944,8 +2970,9 @@ function AdminWorkflows({ rows, refresh, flash, pendingRequests }) {
           Alasan koreksi
           <textarea name="reason" minLength="5" required />
         </label>
-        <button className="primary">Simpan koreksi</button>
-      </form>
+        <button className="primary" disabled={correcting}>{correcting ? "Menyimpan..." : "Simpan koreksi"}</button>
+        </form>}
+      </section>
       <div className="panel audit-panel" id="admin-request-history" tabIndex={-1}>
         <div className="section-head">
           <div>

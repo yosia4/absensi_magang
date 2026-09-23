@@ -1,0 +1,74 @@
+.checkout-correction > p {
+  color: #66758a;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.checkout-correction-preview {
+  background: #f2f8f4;
+  border: 1px solid #d8e7dc;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.checkout-correction-preview h3 {
+  font-size: 15px;
+  color: #28513a;
+}
+.checkout-correction-preview p {
+  color: #566d60;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.checkout-correction-preview dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0 0;
+}
+.checkout-correction-preview dt {
+  font-size: 12px;
+  color: #627469;
+}
+.checkout-correction-preview dd {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 6px 0;
+  color: #28513a;
+}
+@media (max-width: 640px) {
+  .checkout-correction-preview dl {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+.attendance-correction label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 14px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #526276;
+}
+.attendance-correction input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dfe5ec;
+  border-radius: 10px;
+  padding: 11px 12px;
+  font: inherit;
+  background: white;
+}
+.attendance-correction textarea {
+  min-height: 85px;
+  resize: vertical;
+}
+.attendance-correction .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.attendance-correction button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
