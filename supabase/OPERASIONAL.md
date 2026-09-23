@@ -51,6 +51,12 @@ Di **Kelola Pengajuan → Koreksi absensi**, pilih **Hapus absen pulang (salah s
 
 Uji regresi lokal: `node --test tests/*.test.js`. Uji RPC pada PostgreSQL sementara: `node tests/clearCheckout.database.mjs`, dengan paket pengujian opsional `@electric-sql/pglite` tersedia (atau `PGLITE_MODULE` menunjuk URL modul yang dipasang terpisah). Uji tersebut tidak mengakses Supabase dan mencakup hak akses, penjagaan jam masuk/status, konfirmasi yang sudah kedaluwarsa, audit/notifikasi, dan rollback transaksi jika pencatatan gagal.
 
+## Dua tombol absen masuk dan pulang
+
+Sebelum merilis antarmuka dua tombol absensi, jalankan `supabase/migrations/014_explicit_attendance_scan.sql`. Migrasi menambahkan RPC dengan `scan_action` dan `scan_date` wajib. RPC tiga parameter lama berhenti melakukan perubahan dan meminta pengguna memuat ulang aplikasi; rilis frontend baru segera setelah migrasi agar pengguna dapat melanjutkan scan. QR yang sudah ada tetap dapat digunakan. Migrasi tidak mengubah catatan absensi atau fitur koreksi jam pulang.
+
+Uji dengan akun peserta: masuk sekali, ulangi permintaan masuk dan pastikan jam pulang tetap kosong, konfirmasi pulang dan scan, lalu pastikan kedua tombol terkunci. Periksa juga Izin/Sakit/Alpa, tanggal berganti, dan koreksi hapus jam pulang. Uji lokal aturan tombol: `node --test tests/*.test.js`. Uji PostgreSQL sementara: `node tests/explicitScan.database.mjs`, dengan PGlite opsional atau `PGLITE_MODULE` seperti uji koreksi. Kamera/GPS perangkat dan integrasi Supabase tetap perlu diuji pada lingkungan tujuan.
+
 ## Pemulihan jika terjadi masalah
 
 1. Hentikan sementara penggunaan aplikasi agar data tidak berubah.

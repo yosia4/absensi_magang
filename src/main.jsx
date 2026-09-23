@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeSVG } from "qrcode.react";
 import InternDashboard from "./components/InternDashboard";
+import AttendanceScanActions from "./components/AttendanceScanActions";
+import { canScanAction, applyDemoScan } from "./attendanceScan";
 import ParticipantProfile from "./components/ParticipantProfile";
 import PageHeading from "./components/PageHeading";
 import AdminDashboard from "./components/AdminDashboard";
@@ -935,7 +937,17 @@ function InternPage({
   updateUser,
   requestReplies,
 }) {
-  const record = attendance.find((x) => x.date === today);
+  const [currentDay, setCurrentDay] = useState(jakartaToday);
+  const [scanSession, setScanSession] = useState(null);
+  const scanRequestBusy = useRef(false);
+  const record = attendance.find((x) => x.date === currentDay);
+  useEffect(() => {
+    const update = () => setCurrentDay(jakartaToday());
+    const timer = window.setInterval(update, 15000);
+    window.addEventListener("focus", update);
+    return () => { clearInterval(timer); window.removeEventListener("focus", update); };
+  }, []);
+  useEffect(() => { if (page !== "scan") setScanSession(null); }, [page]);
   const [scanSuccess, setScanSuccess] = useState(null);
   const closeScanSuccess = useCallback(() => setScanSuccess(null), []);
   const [attendanceLoading, setAttendanceLoading] = useState(!!supabase);
@@ -966,78 +978,105 @@ function InternPage({
     const channel = supabase.channel("intern-attendance-" + user.id).on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: "user_id=eq." + user.id }, load).subscribe();
     return () => { disposed = true; controller?.abort(); supabase.removeChannel(channel); };
   }, [user.id, attendanceRevision]);
-  const processScan = async (token, location) => {
-    if (attendanceLoading || attendanceError || !attendanceDisplayState(record).canScan) {
-      flash("Absensi belum dapat diproses. Periksa status hari ini atau hubungi pembimbing.", "error");
+  const startScan = (action) => {
+    if (attendanceLoading || attendanceError || !canScanAction(record, action)) return;
+    setScanSession({ action, date: currentDay });
+    nav("scan");
+  };
+  const processScan = async (token, location, session) => {
+    if (scanRequestBusy.current) return false;
+    if (
+      !session ||
+      session.date !== jakartaToday() ||
+      attendanceLoading ||
+      attendanceError ||
+      !canScanAction(record, session.action)
+    ) {
+      flash(
+        "Absensi belum dapat diproses. Periksa status hari ini atau hubungi pembimbing.",
+        "error",
+      );
       return false;
     }
-    if (supabase) {
-      const { data, error } = await supabase.rpc("scan_attendance", {
-        qr_token: token,
-        scan_latitude: location?.latitude,
-        scan_longitude: location?.longitude,
-      });
-      if (error) {
-        await saveFailureNotification(error.message);
-        flash(error.message, "error");
-        return false;
+    scanRequestBusy.current = true;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.rpc("scan_attendance", {
+          qr_token: token,
+          scan_latitude: location?.latitude,
+          scan_longitude: location?.longitude,
+          scan_action: session.action,
+          scan_date: session.date,
+        });
+        if (error) {
+          const message =
+            error.code === "PGRST202"
+              ? "Layanan scan perlu diperbarui. Hubungi pembimbing."
+              : error.message;
+          flash(message, "error");
+          saveFailureNotification(message).catch(() => {});
+          return false;
+        }
+        setAttendance((a) => [
+          {
+            date: data.date,
+            check_in: data.check_in
+              ? new Intl.DateTimeFormat("id-ID", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                  timeZone: "Asia/Jakarta",
+                }).format(new Date(data.check_in))
+              : null,
+            check_out: data.check_out
+              ? new Intl.DateTimeFormat("id-ID", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                  timeZone: "Asia/Jakarta",
+                }).format(new Date(data.check_out))
+              : null,
+            status: data.status,
+          },
+          ...a.filter((x) => x.date !== data.date),
+        ]);
+        setScanSuccess({
+          checkout: session.action === "check_out",
+          time: formatTime(
+            session.action === "check_out" ? data.check_out : data.check_in,
+          ),
+        });
+        nav("dashboard");
+        return true;
       }
-      setAttendance((a) => [
-        {
-          date: data.date,
-          check_in: data.check_in
-            ? new Intl.DateTimeFormat("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-                timeZone: "Asia/Jakarta",
-              }).format(new Date(data.check_in))
-            : null,
-          check_out: data.check_out
-            ? new Intl.DateTimeFormat("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-                timeZone: "Asia/Jakarta",
-              }).format(new Date(data.check_out))
-            : null,
-          status: data.status,
-        },
-        ...a.filter((x) => x.date !== data.date),
-      ]);
-      setScanSuccess({
-        checkout: Boolean(data.check_out),
-        time: formatTime(data.check_out || data.check_in),
-      });
+      const now = getTime();
+      setAttendance((a) => applyDemoScan(a, session.date, session.action, now));
+      setScanSuccess({ checkout: session.action === "check_out", time: now });
       nav("dashboard");
       return true;
+    } catch {
+      flash(
+        "Scan belum dapat dipastikan. Periksa koneksi dan status absensi sebelum mencoba kembali.",
+        "error",
+      );
+      setAttendanceRevision((value) => value + 1);
+      return false;
+    } finally {
+      scanRequestBusy.current = false;
     }
-    const now = getTime();
-    setAttendance((a) =>
-      a.some((x) => x.date === today)
-        ? a.map((x) =>
-            x.date === today ? { ...x, check_out: now, status: "Hadir" } : x,
-          )
-        : [
-            { date: today, check_in: now, check_out: null, status: "Hadir" },
-            ...a,
-          ],
-    );
-    setScanSuccess({ checkout: Boolean(record), time: now });
-    nav("dashboard");
-    return true;
   };
   let content;
   if ((page === "scan" || page === "dashboard") && attendanceLoading) {
     content = <><Skeleton variant="cards" label="Memuat status absensi..." /><Skeleton variant="table" label="Memuat aktivitas..." /></>;
   } else if ((page === "scan" || page === "dashboard") && attendanceError) {
     content = <DataLoadError message={attendanceError} loading={false} onRetry={() => setAttendanceRevision((value) => value + 1)} />;
-  } else if (page === "scan" && !attendanceDisplayState(record).canScan) {
-    content = <div className="panel"><h2>{attendanceDisplayState(record).title}</h2><p>{attendanceDisplayState(record).description}</p><button className="outline" onClick={() => nav("dashboard")}>Kembali ke dashboard</button></div>;
+  } else if (page === "scan" && (!scanSession || scanSession.date !== currentDay || !canScanAction(record, scanSession.action))) {
+    content = <div className="panel"><h2>Pilih jenis absensi</h2><p>{attendanceDisplayState(record).description}</p><AttendanceScanActions record={record} onStart={startScan} /><button className="outline" onClick={() => nav("dashboard")}>Kembali ke beranda</button></div>;
   } else if (page === "scan") {
     content = (
       <Scanner
-        record={record}
+        key={`${scanSession.date}:${scanSession.action}`}
+        session={scanSession}
         onDone={processScan}
         onCancel={() => nav("dashboard")}
       />
@@ -1051,6 +1090,7 @@ function InternPage({
   } else {
     content = (
       <InternDashboard
+        onStartScan={startScan}
         user={user}
         record={record}
         nav={nav}
@@ -1071,7 +1111,11 @@ function InternPage({
     </>
   );
 }
-function Scanner({ record, onDone, onCancel }) {
+function Scanner({ session, onDone, onCancel }) {
+  const [retryScan, setRetryScan] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
   const [error, setError] = useState(""),
     [userLocation, setUserLocation] = useState(null),
     [requesting, setRequesting] = useState(false),
@@ -1129,51 +1173,58 @@ function Scanner({ record, onDone, onCancel }) {
   };
   useEffect(() => {
     if (!userLocation || !cameraReady) return;
+    let disposed = false;
     const html5Qrcode = new Html5Qrcode("qr-reader");
     scanner.current = html5Qrcode;
     // Paksa kamera belakang secara eksplisit. Tanpa constraint ini, browser
     // kadang memilih kamera depan (urutan enumerasi kamera berbeda-beda
     // per perangkat), jadi tidak bisa mengandalkan pemilihan otomatis library.
-    html5Qrcode
+    const started = html5Qrcode
       .start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 220, height: 220 } },
         async (decoded) => {
-          if (busy.current) return;
+          if (disposed || busy.current) return;
           busy.current = true;
-          const success = await onDone(decoded, locationRef.current);
-          if (success) {
-            try {
+          setProcessing(true);
+          try {
+            html5Qrcode.pause(true);
+            const success = await onDoneRef.current(decoded, locationRef.current, session);
+            if (disposed) return;
+            if (success) {
               if (html5Qrcode.isScanning) await html5Qrcode.stop();
-            } catch {}
-          } else {
-            busy.current = false;
+            } else {
+              setRetryScan(true);
+            }
+          } catch {
+            if (!disposed) { setError("Scan belum berhasil. Periksa status absensi sebelum mencoba kembali."); setRetryScan(true); }
+          } finally {
+            if (!disposed) setProcessing(false);
           }
         },
         () => {},
       )
-      .catch(() =>
-        setError("Tidak dapat membuka kamera belakang. Coba lagi."),
-      );
+      .catch(() => { if (!disposed) setError("Tidak dapat membuka kamera belakang. Kembali lalu coba lagi."); });
     return () => {
-      (async () => {
+      disposed = true;
+      started.then(async () => {
         try {
           if (html5Qrcode.isScanning) await html5Qrcode.stop();
         } catch {}
         try {
           html5Qrcode.clear();
         } catch {}
-      })();
+      });
     };
   }, [userLocation, cameraReady]);
   return (
-    <div className="scanner-page">
-      <button className="back" onClick={onCancel}>
+    <div className={`scanner-page scan-${session.action}`}>
+      <button className="back" onClick={onCancel} disabled={processing}>
         <ChevronLeft size={20} /> Kembali
       </button>
       <div className="scanner-copy">
-        <span className="eyebrow">{record?.check_in ? "CHECK-OUT" : "CHECK-IN"}</span>
-        <h2>Scan Absensi</h2>
+        <span className="eyebrow">{session.action === "check_out" ? "ABSEN PULANG" : "ABSEN MASUK"}</span>
+        <h2>{session.action === "check_out" ? "Scan Absen Pulang" : "Scan Absen Masuk"}</h2>
         <p>Tekan tombol untuk mengizinkan lokasi dan kamera.</p>
       </div>
       <button
@@ -1182,7 +1233,7 @@ function Scanner({ record, onDone, onCancel }) {
           (userLocation ? "location-ready" : "")
         }
         onClick={activateLocation}
-        disabled={requesting}
+        disabled={requesting || Boolean(userLocation)}
       >
         {userLocation ? (
           <>
@@ -1211,6 +1262,11 @@ function Scanner({ record, onDone, onCancel }) {
         )}
       </div>
       {error && <p className="error">{error}</p>}
+      {processing && <p role="status">Menyimpan absensi...</p>}
+      {retryScan && <button className="outline" onClick={() => {
+        try { scanner.current?.resume(); busy.current = false; setRetryScan(false); setError(""); }
+        catch { setError("Kamera belum siap. Kembali lalu buka scan lagi."); }
+      }}>Coba scan lagi</button>}
       <p className="scanner-tip">
         <MapPin size={16} /> Pemindaian hanya menggunakan kamera perangkat.
       </p>

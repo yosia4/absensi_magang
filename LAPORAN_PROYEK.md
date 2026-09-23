@@ -75,6 +75,8 @@ Proyek ini menggunakan beberapa bahasa dan format berikut.
 - Dashboard dengan data absensi aktual, tanpa data contoh.
 - Dashboard membedakan Izin, Sakit, Alpa, belum absen, sudah check-in, dan absensi selesai. Check-out hanya ditawarkan jika ada jam masuk. Status Izin/Sakit/Alpa serta catatan tanpa jam masuk yang perlu ditinjau tidak membuka scanner dari antarmuka peserta.
 - Scan QR melalui kamera perangkat.
+- Beranda dan menu Scan Absen menyediakan tombol **Absen Masuk** (hijau, ikon masuk) dan **Absen Pulang** (biru, ikon keluar) berdampingan, termasuk pada ponsel. Sebelum masuk hanya tombol Masuk yang aktif; setelah masuk tombol tersebut menampilkan jam dan terkunci, sedangkan Pulang aktif. Setelah pulang kedua tombol menampilkan jam masing-masing dan terkunci. Izin/Sakit/Alpa serta catatan tanpa jam masuk tetap tidak membuka scanner. Tombol Pulang meminta konfirmasi **Ingin mencatat kepulangan sekarang?** sebelum membuka halaman kamera.
+- Tujuan masuk/pulang dan tanggal WIB dikunci saat tombol dipilih, kemudian dikirim ke server. Pembacaan QR dihentikan sementara setelah terdeteksi dan satu permintaan diproses per sesi. Scan masuk berulang tidak dapat mengisi jam pulang; scan pulang berulang tidak mengganti jam yang sudah tercatat. Kegagalan tidak mengulang scan secara otomatis. Server tetap memeriksa akun aktif, QR, GPS, radius, hari kerja, status, dan tanggal; jalur RPC lama meminta aplikasi dimuat ulang. Perubahan ini memerlukan migrasi `014_explicit_attendance_scan.sql`.
 - Validasi izin kamera dan lokasi GPS sebelum QR diproses.
 - Validasi radius lokasi absensi (geofencing).
 - Check-in dan check-out pada QR yang sama.

@@ -1,0 +1,76 @@
+.attendance-scan-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.attendance-scan-button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 100px;
+  padding: 20px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  text-align: left;
+  color: white;
+}
+.attendance-scan-button > svg {
+  flex-shrink: 0;
+}
+.attendance-scan-button span {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.attendance-scan-button strong {
+  font-size: 16px;
+  line-height: 1.4;
+}
+.attendance-scan-button small {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.scan-enter {
+  background: #16734d;
+}
+.scan-leave {
+  background: #2563ad;
+}
+.scan-enter:disabled {
+  background: #eaf4ee;
+  color: #41634d;
+  border-color: #cddfd3;
+  cursor: not-allowed;
+}
+.scan-leave:disabled {
+  background: #ecf2f9;
+  color: #45607d;
+  border-color: #d4e0ee;
+  cursor: not-allowed;
+}
+.attendance-scan-button:focus-visible {
+  outline: 3px solid #b78b30;
+  outline-offset: 3px;
+}
+.scanner-page.scan-check_out .location-button {
+  background: #2563ad;
+}
+@media (max-width: 640px) {
+  .attendance-scan-actions {
+    gap: 10px;
+  }
+  .attendance-scan-button {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 15px 12px;
+  }
+  .attendance-scan-button strong {
+    font-size: 14px;
+  }
+  .attendance-scan-button small {
+    font-size: 11px;
+  }
+}

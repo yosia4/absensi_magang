@@ -1,16 +1,15 @@
 import React from "react";
 import {
   Clock3,
-  QrCode,
-  ChevronLeft,
   MoreHorizontal,
   CalendarDays,
 } from "lucide-react";
 import { dateLabel as formatDate, jakartaToday } from "../attendanceVisuals";
 import { attendanceDisplayState } from "../attendanceSummary";
 import StatusBadge from "./StatusBadge";
+import AttendanceScanActions from "./AttendanceScanActions";
 
-export default function InternDashboard({ user, record, nav, attendance }) {
+export default function InternDashboard({ user, record, nav, attendance, onStartScan }) {
   const today = jakartaToday();
   const display = attendanceDisplayState(record);
   const { checkedIn } = display;
@@ -74,22 +73,7 @@ export default function InternDashboard({ user, record, nav, attendance }) {
           </span>
         </div>
       </section>
-      <button
-        disabled={!display.canScan}
-        className="scan-cta"
-        onClick={() => nav("scan")}
-      >
-        <span className="scan-icon">
-          <QrCode size={30} />
-        </span>
-        <span>
-          <b>{display.action}</b>
-          <small>
-            {display.canScan ? "Ketuk untuk membuka kamera" : display.progress}
-          </small>
-        </span>
-        <ChevronLeft className="rotate" />
-      </button>
+      <AttendanceScanActions record={record} onStart={onStartScan} />
       <section className="split">
         <div className="panel">
           <div className="panel-heading">
