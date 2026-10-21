@@ -7,7 +7,7 @@ export default function WebsiteLogo() {
     <img
       className="website-logo"
       src={websiteLogoSrc}
-      alt="Logo Rawuh Pustaka"
+      alt="Logo Cah Magang"
       width="64"
       height="64"
     />

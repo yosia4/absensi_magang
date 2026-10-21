@@ -7,12 +7,15 @@ import InternDashboard from "./components/InternDashboard";
 import AttendanceScanActions from "./components/AttendanceScanActions";
 import { canScanAction, applyDemoScan } from "./attendanceScan";
 import ParticipantProfile from "./components/ParticipantProfile";
+import ProfilePhoto, { PhotoUrlContext } from "./components/ProfilePhoto";
+import { getPhotoPath, createPhotoUrlResolver, validateProfilePhoto } from "./profilePhotos";
 import PageHeading from "./components/PageHeading";
 import AdminDashboard from "./components/AdminDashboard";
 import PendingRequestBadge from "./components/PendingRequestBadge";
 import usePendingRequests from "./components/usePendingRequests";
 import useRequestReplies from "./components/useRequestReplies";
 import { jakartaToday } from "./attendanceVisuals";
+import { hasInternshipEnded, deactivateEndedInterns } from "./internshipPeriod";
 import AttendanceReports from "./components/AttendanceReports";
 import Skeleton from "./components/Skeleton";
 import { attendanceDisplayState, fetchAllPages } from "./attendanceSummary";
@@ -134,8 +137,13 @@ const sampleRows = [
 ];
 const demoAccountsKey = "magang-accounts";
 const demoEnabled = import.meta.env.DEV && !supabase;
-const getDemoAccounts = () =>
-  JSON.parse(localStorage.getItem(demoAccountsKey) || "[]");
+const getDemoAccounts = () => {
+  const previous = JSON.parse(localStorage.getItem(demoAccountsKey) || "[]");
+  const accounts = deactivateEndedInterns(previous, jakartaToday());
+  if (accounts.some((account, index) => account !== previous[index]))
+    localStorage.setItem(demoAccountsKey, JSON.stringify(accounts));
+  return accounts;
+};
 const getDemoRows = () => {
   const accounts = getDemoAccounts().filter((x) => x.role === "intern");
   return accounts.length
@@ -199,35 +207,7 @@ const timeOfDayJakarta = (v) => {
   return `${get("hour")}:${get("minute")}`;
 };
 
-const getPhotoPath = (value = "") => {
-  const marker = "/profile-photos/";
-  if (!value.startsWith("http") || !value.includes(marker)) return value;
-  return decodeURIComponent(value.split(marker)[1].split("?")[0]);
-};
-
-// Cache per path (bukan per URL) selama ~50 menit (token berlaku 60 menit) agar
-// realtime refresh yang sering (mis. setiap ada yang absen) tidak membuat ulang
-// signed URL untuk semua foto setiap saat — path tetap sama walau foto diganti,
-// jadi cache tidak pernah menyajikan foto basi.
-const signedPhotoUrlCache = new Map();
-const getSignedPhotoUrl = async (value) => {
-  if (!supabase || !value) return value || "";
-  const path = getPhotoPath(value);
-  if (!path || (path.startsWith("http") && path === value)) return value;
-  const cached = signedPhotoUrlCache.get(path);
-  if (cached && cached.expiresAt > Date.now()) return cached.url;
-  const { data, error } = await supabase.storage
-    .from("profile-photos")
-    .createSignedUrl(path, 60 * 60);
-  // URL lama (public atau signed) tetap bisa dipakai. Untuk path private,
-  // selalu buat URL baru agar foto yang baru diunggah langsung tampil.
-  if (error) return path.startsWith("http") ? value : "";
-  signedPhotoUrlCache.set(path, {
-    url: data.signedUrl,
-    expiresAt: Date.now() + 50 * 60 * 1000,
-  });
-  return data.signedUrl;
-};
+const getSignedPhotoUrl = createPhotoUrlResolver(supabase);
 
 const showAppMessage = (message, type = "success") =>
   window.dispatchEvent(
@@ -287,7 +267,7 @@ function App() {
           .select("*")
           .eq("id", session.user.id)
           .single();
-        if (profile?.is_active) {
+        if (profile?.is_active && !hasInternshipEnded(profile, jakartaToday())) {
           const photoPath = getPhotoPath(profile.photo_url || "");
           const signedPhotoUrl = await getSignedPhotoUrl(photoPath);
           setUser({
@@ -301,6 +281,8 @@ function App() {
               .join("")
               .toUpperCase(),
           });
+        } else if (profile) {
+          await supabase.auth.signOut();
         }
       })
       .finally(() => setAuthReady(true));
@@ -320,11 +302,43 @@ function App() {
     return () => authListener.subscription.unsubscribe();
   }, []);
   useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--active-profile-photo",
-      user?.photo_url ? `url("${user.photo_url}")` : "none",
-    );
-  }, [user]);
+    if (user?.role !== "intern") return;
+    let disposed = false;
+    const checkStatus = async () => {
+      if (document.visibilityState !== "visible") return;
+      let profile = user;
+      if (supabase) {
+        const { data, error } = await supabase.from("profiles")
+          .select("role,is_active,internship_end").eq("id", user.id).maybeSingle();
+        if (disposed || error || !data) return;
+        profile = data;
+      } else {
+        profile = getDemoAccounts().find((account) => account.email === user.email) || user;
+      }
+      if (disposed) return;
+      if (profile.is_active === false || hasInternshipEnded(profile, jakartaToday())) {
+        setUser(null);
+        if (supabase) await supabase.auth.signOut();
+      } else if (profile.internship_end !== user.internship_end) {
+        setUser((current) => current ? { ...current, internship_end: profile.internship_end } : current);
+      }
+    };
+    const refresh = () => { checkStatus().catch(() => {}); };
+    refresh();
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const channel = supabase?.channel(`intern-account-status-${user.id}`)
+      .on("postgres_changes", {event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}`}, refresh)
+      .subscribe();
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user?.id, user?.email, user?.role, user?.internship_end]);
   useEffect(() => {
     if (!supabase || !user?.id) return;
     const loadNotifications = async () => {
@@ -417,7 +431,6 @@ function App() {
         ]
       : [
           ["dashboard", "Beranda", Home],
-          ["scan", "Scan Absen", QrCode],
           ["history", "Riwayat", CalendarDays],
           ["leave", "Izin / Sakit", FileText],
           ["profile", "Profil", User],
@@ -468,7 +481,7 @@ function App() {
             <LogOut size={19} />
             Keluar
           </button>
-          <small>© 2026 Rawuh Pustaka</small>
+          <small>© 2026 Cah Magang</small>
         </div>
       </aside>
       <main>
@@ -520,7 +533,7 @@ function App() {
               aria-label="Lihat profil"
               title="Profil"
             >
-              {!user.photo_url && user.initials}
+              <ProfilePhoto src={user.photo_path || user.photo_url} initials={user.initials} alt={user.name} className="avatar table-photo" />
             </button>
           </div>
         </header>
@@ -645,7 +658,7 @@ function Login({ onLogin }) {
           .select("*")
           .eq("id", data.user.id)
           .single();
-        if (profileError || !foundProfile?.is_active) {
+        if (profileError || !foundProfile?.is_active || hasInternshipEnded(foundProfile, jakartaToday())) {
           await supabase.auth.signOut();
           if (profileError) throw profileError;
           throw new Error(
@@ -653,6 +666,9 @@ function Login({ onLogin }) {
           );
         }
         profile = foundProfile;
+      }
+      if (profile.is_active === false || hasInternshipEnded(profile, jakartaToday())) {
+        throw new Error("Akun sudah nonaktif atau masa magang telah selesai. Hubungi pembimbing.");
       }
       if (
         (admin && profile.role !== "admin") ||
@@ -835,7 +851,7 @@ function Login({ onLogin }) {
             <br />
             <strong>bertumbuh setiap hari.</strong>
           </p>
-          <small>Sistem absensi magang &middot; Rawuh Pustaka</small>
+          <small>Sistem absensi magang &middot; Cah Magang</small>
         </section>
       </section>
       {loginFeedback && (
@@ -1387,15 +1403,17 @@ function Profile({ user, updateUser }) {
       photoUrl = profile.photo_url || "",
       file = form.get("photo");
     if (file instanceof File && file.size) {
-      if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
-        showAppMessage("Gunakan gambar maksimal 5 MB.", "error");
+      try {
+        await validateProfilePhoto(file);
+      } catch (error) {
+        showAppMessage(error.message, "error");
         setSaving(false);
         return;
       }
-      const path = `${user.id}/profile`;
+      const path = `${user.id}/profile-${crypto.randomUUID()}`;
       const { error } = await supabase.storage
         .from("profile-photos")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, file, { contentType: file.type });
       if (error) {
         showAppMessage(error.message, "error");
         setSaving(false);
@@ -1571,6 +1589,7 @@ function AdminPage({ page, nav, flash, pendingRequests }) {
               const a = byUser.get(p.id);
               return {
                 ...p,
+                photo_path: getPhotoPath(p.photo_url),
                 photo_url: await getSignedPhotoUrl(p.photo_url),
                 initials: p.name
                   .split(" ")
@@ -1767,7 +1786,7 @@ function PhotoViewerModal({ intern, onClose }) {
         <button type="button" className="modal-close" onClick={onClose} aria-label="Tutup foto">
           <X size={20} />
         </button>
-        <img src={intern.photo_url} alt={`Foto profil ${intern.name}`} />
+        <ProfilePhoto src={intern.photo_path || intern.photo_url} alt={`Foto profil ${intern.name}`} initials={intern.initials} />
         <p>{intern.name}</p>
       </section>
     </div>
@@ -2059,7 +2078,9 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
         role: "intern",
       });
       localStorage.setItem(demoAccountsKey, JSON.stringify(accounts));
-      flash("Akun berhasil ditambahkan dan langsung dapat login.");
+      flash(hasInternshipEnded({ ...form, role: "intern" }, jakartaToday())
+        ? "Akun ditambahkan dalam status nonaktif karena masa magang telah selesai."
+        : "Akun berhasil ditambahkan dan langsung dapat login.");
       close();
       return;
     }
@@ -2099,7 +2120,9 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
       return;
     }
     flash(
-      "Akun anak magang berhasil ditambahkan dan siap digunakan untuk login.",
+      hasInternshipEnded({ ...form, role: "intern" }, jakartaToday())
+        ? "Akun ditambahkan dalam status nonaktif karena masa magang telah selesai."
+        : "Akun anak magang berhasil ditambahkan dan siap digunakan untuk login.",
     );
     close();
     refresh();
@@ -2142,6 +2165,10 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
     setOpen(true);
   };
   const toggleActive = async (intern) => {
+    if (!intern.is_active && hasInternshipEnded({ ...intern, role: "intern" }, jakartaToday())) {
+      flash("Masa magang telah selesai. Perbarui tanggal selesai sebelum mengaktifkan akun kembali.", "error");
+      return;
+    }
     if (!supabase) {
       const accounts = getDemoAccounts();
       const i = accounts.findIndex((x) => x.email === intern.email);
@@ -2247,7 +2274,7 @@ function Interns({ rows, loading, loadError, onRetry, refresh, flash }) {
             <h2>{editing ? "Edit Anak Magang" : "Tambah Anak Magang"}</h2>
             <p>
               {editing
-                ? "Perbarui data penempatan anak magang."
+                ? "Perbarui data anak magang."
                 : "Akun dan data magang langsung dibuat oleh pembimbing."}
             </p>
             <label>
@@ -3256,18 +3283,20 @@ function AccountSettings() {
     let photoPath = profile.photo_path || getPhotoPath(profile.photo_url || ""),
       photoUrl = profile.photo_url || "";
     if (file instanceof File && file.size) {
-      if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
-        showAppMessage("Gunakan gambar maksimal 5 MB.", "error");
+      try {
+        await validateProfilePhoto(file);
+      } catch (error) {
+        showAppMessage(error.message, "error");
         setSaving(false);
         return;
       }
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const path = `${user.id}/profile`;
+      const path = `${user.id}/profile-${crypto.randomUUID()}`;
       const { error: uploadError } = await supabase.storage
         .from("profile-photos")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, file, { contentType: file.type });
       if (uploadError) {
         showAppMessage(uploadError.message, "error");
         setSaving(false);
@@ -3364,6 +3393,8 @@ class AppErrorBoundary extends React.Component {
 
 createRoot(document.getElementById("root")).render(
   <AppErrorBoundary>
-    <App />
+    <PhotoUrlContext.Provider value={getSignedPhotoUrl}>
+      <App />
+    </PhotoUrlContext.Provider>
   </AppErrorBoundary>,
 );

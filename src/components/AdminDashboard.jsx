@@ -63,7 +63,7 @@ export default function AdminDashboard({
     <div className="admin-dashboard">
       <section className="panel admin-dashboard-hero">
         <div>
-          <span className="admin-dashboard-eyebrow">RAWUH PUSTAKA</span>
+          <span className="admin-dashboard-eyebrow">CAH MAGANG</span>
           <h2>Dashboard Admin</h2>
           <p>Ringkasan kehadiran peserta magang</p>
         </div>

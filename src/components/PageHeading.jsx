@@ -15,7 +15,7 @@ export default function PageHeading({
           <Icon size={25} strokeWidth={1.8} />
         </span>
         <div className="page-heading-copy">
-          <span className="page-heading-brand">RAWUH PUSTAKA</span>
+          <span className="page-heading-brand">CAH MAGANG</span>
           <h2>{title}</h2>
           <p className="page-heading-description">{description}</p>
           {children}

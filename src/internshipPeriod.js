@@ -67,3 +67,23 @@ export function internshipPeriod(start, end, today) {
     progress: total === null ? null : Math.round((day / total) * 100),
   };
 }
+
+// The end date is inclusive: deactivate starting the following WIB day.
+export function hasInternshipEnded(profile, today) {
+  const end = dateValue(profile?.internship_end),
+    current = dateValue(today);
+  return (
+    profile?.role === "intern" &&
+    end !== null &&
+    current !== null &&
+    end < current
+  );
+}
+
+export function deactivateEndedInterns(accounts, today) {
+  return accounts.map((account) =>
+    account.is_active !== false && hasInternshipEnded(account, today)
+      ? { ...account, is_active: false }
+      : account,
+  );
+}

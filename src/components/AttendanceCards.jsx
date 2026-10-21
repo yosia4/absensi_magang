@@ -97,7 +97,7 @@ export default function AttendanceCards({
               )}
             </dl>
             <div className="attendance-card-actions">
-              {onPhotoClick && row.photo_url && (
+              {onPhotoClick && (row.photo_path || row.photo_url) && (
                 <button
                   type="button"
                   className="text-btn"

@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle, Check } from "lucide-react";
 import AnimatedLoginLogo from "./AnimatedLoginLogo";
+import BrandName from "./BrandName";
 import "./LoginFeedback.css";
 
 export default function LoginFeedback({ phase, name, message, onContinue }) {
@@ -54,6 +55,7 @@ export default function LoginFeedback({ phase, name, message, onContinue }) {
           </span>
         )}
       </div>
+      <BrandName />
       <div
         className="login-feedback-copy"
         aria-live="polite"
@@ -66,7 +68,7 @@ export default function LoginFeedback({ phase, name, message, onContinue }) {
           {phase === "success" ? (
             <>
               <strong>{name}</strong>
-              <span>Senang bertemu kembali di Rawuh Pustaka.</span>
+              <span>Senang bertemu kembali di Cah Magang.</span>
             </>
           ) : phase === "error" ? (
             message

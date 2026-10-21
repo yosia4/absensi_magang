@@ -14,11 +14,10 @@ import {
 import { dateLabel, jakartaToday } from "../attendanceVisuals";
 import { internshipPeriod } from "../internshipPeriod";
 import "./ParticipantProfile.css";
+import ProfilePhoto from "./ProfilePhoto";
 
 export default function ParticipantProfile({ profile, onEdit, onViewPhoto }) {
   const [today, setToday] = useState(jakartaToday);
-  const [photoFailed, setPhotoFailed] = useState(false);
-  useEffect(() => setPhotoFailed(false), [profile.photo_url]);
   useEffect(() => {
     const update = () => {
       if (document.visibilityState === "visible") setToday(jakartaToday());
@@ -75,17 +74,18 @@ export default function ParticipantProfile({ profile, onEdit, onViewPhoto }) {
         </button>
       </div>
       <div className="participant-identity">
-        {profile.photo_url && !photoFailed ? (
+        {profile.photo_path || profile.photo_url ? (
           <button
             type="button"
             className="participant-photo"
             onClick={onViewPhoto}
             aria-label="Lihat foto profil ukuran besar"
           >
-            <img
-              src={profile.photo_url}
+            <ProfilePhoto
+              src={profile.photo_path || profile.photo_url}
+              initials={initials}
+              className="participant-initials"
               alt={`Foto ${profile.name}`}
-              onError={() => setPhotoFailed(true)}
             />
           </button>
         ) : (

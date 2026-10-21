@@ -1,4 +1,5 @@
 import React from "react";
+import ProfilePhoto from "./ProfilePhoto";
 import AttendanceCards from "./AttendanceCards";
 import StatusBadge from "./StatusBadge";
 import Skeleton from "./Skeleton";
@@ -58,7 +59,7 @@ export default function AttendanceTable({
             <tr key={x.id || i}>
               <td>
                 <span className="person">
-                  {x.photo_url ? (
+                  {x.photo_path || x.photo_url ? (
                     <button
                       type="button"
                       className="table-photo-button"
@@ -68,9 +69,10 @@ export default function AttendanceTable({
                         onPhotoClick ? `Lihat foto profil ${x.name}` : undefined
                       }
                     >
-                      <img
+                      <ProfilePhoto
                         className="avatar small table-photo"
-                        src={x.photo_url}
+                        src={x.photo_path || x.photo_url}
+                        initials={x.initials}
                         alt={onPhotoClick ? "" : x.name}
                       />
                     </button>

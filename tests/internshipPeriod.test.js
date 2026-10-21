@@ -1,6 +1,54 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { internshipPeriod } from "../src/internshipPeriod.js";
+import {
+  internshipPeriod,
+  hasInternshipEnded,
+  deactivateEndedInterns,
+} from "../src/internshipPeriod.js";
+import { jakartaToday } from "../src/attendanceVisuals.js";
+
+test("automatic deactivation respects the end date through midnight WIB and only affects interns", () => {
+  const intern = {
+    role: "intern",
+    is_active: true,
+    internship_end: "2026-09-25",
+  };
+  assert.equal(
+    hasInternshipEnded(intern, jakartaToday(new Date("2026-09-25T16:59:59Z"))),
+    false,
+  );
+  assert.equal(
+    hasInternshipEnded(intern, jakartaToday(new Date("2026-09-25T17:00:00Z"))),
+    true,
+  );
+  assert.equal(
+    hasInternshipEnded({ ...intern, role: "admin" }, "2026-09-26"),
+    false,
+  );
+  assert.equal(
+    hasInternshipEnded({ ...intern, internship_end: "" }, "2026-09-26"),
+    false,
+  );
+  assert.equal(
+    hasInternshipEnded(
+      { ...intern, internship_end: "2026-02-30" },
+      "2026-09-26",
+    ),
+    false,
+  );
+  const manualInactive = {
+    ...intern,
+    is_active: false,
+    internship_end: "2027-01-01",
+  };
+  const accounts = [intern, manualInactive, { ...intern, role: "admin" }];
+  const expired = deactivateEndedInterns(accounts, "2026-09-26");
+  assert.equal(expired[0].is_active, false);
+  assert.equal(intern.is_active, true);
+  assert.equal(expired[1], manualInactive);
+  assert.equal(expired[2], accounts[2]);
+  assert.equal(deactivateEndedInterns(expired, "2026-09-26")[0], expired[0]);
+});
 
 test("remaining calendar days include today and the end date", () => {
   const period = internshipPeriod("2026-09-01", "2026-09-30", "2026-09-21");

@@ -1,4 +1,5 @@
 import React from "react";
+import ProfilePhoto from "./ProfilePhoto";
 import {
   Clock3,
   MoreHorizontal,
@@ -38,15 +39,12 @@ export default function InternDashboard({ user, record, nav, attendance, onStart
       </div>
       <section className="status-grid">
         <div className="status-card">
-          {user.photo_url ? (
-            <img
-              className="avatar large table-photo"
-              src={user.photo_url}
-              alt={user.name}
-            />
-          ) : (
-            <div className="avatar large">{user.initials}</div>
-          )}
+          <ProfilePhoto
+            className="avatar large table-photo"
+            src={user.photo_path || user.photo_url}
+            alt={user.name}
+            initials={user.initials}
+          />
           <div>
             <small>STATUS KEHADIRAN</small>
             <h3>{display.status}</h3>

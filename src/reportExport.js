@@ -76,7 +76,7 @@ export async function exportAttendanceExcel({
       [28, 14, 18, 18, 48, 18],
     );
   const info = XLSX.utils.aoa_to_sheet([
-    ["Laporan Kehadiran", "Rawuh Pustaka"],
+    ["Laporan Kehadiran", "Cah Magang"],
     ["Periode", label],
     ["Waktu cetak", printedAt(new Date())],
     ["Pencarian peserta", search || "Semua peserta"],
@@ -105,7 +105,7 @@ export async function buildAttendancePdf(
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setProperties({
     title: `Laporan Kehadiran - ${label}`,
-    author: "Rawuh Pustaka",
+    author: "Cah Magang",
   });
   const clean = (value) => String(value ?? "-").replace(/[—–]/g, "-");
   const timestamp = printedAt(now);
@@ -127,7 +127,7 @@ export async function buildAttendancePdf(
     doc.setTextColor(24, 117, 80);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("RAWUH PUSTAKA", 37, 16);
+    doc.text("CAH MAGANG", 37, 16);
     doc.setTextColor(30, 45, 62);
     doc.setFontSize(15);
     doc.text("Laporan Kehadiran", 37, 23);
@@ -332,7 +332,7 @@ export async function buildAttendancePdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(90, 105, 119);
-    doc.text("Rawuh Pustaka | Laporan Kehadiran", 14, 289);
+    doc.text("Cah Magang | Laporan Kehadiran", 14, 289);
     doc.text(`Halaman ${page} dari ${pages}`, 196, 289, { align: "right" });
   }
   return doc;
