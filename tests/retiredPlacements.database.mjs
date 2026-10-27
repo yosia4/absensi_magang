@@ -4,7 +4,8 @@ import fs from "node:fs";
 const { PGlite } = await import(process.env.PGLITE_MODULE || "@electric-sql/pglite");
 const db = new PGlite();
 const readMigration = (name) => fs.readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8");
-const retire = readMigration("026_retire_intern_placements.sql");
+const retire = readMigration("028_disable_intern_placements.sql");
+const restore = readMigration("027_restore_intern_placements.sql");
 try {
   await db.exec(`
     create role anon; create role authenticated; create schema auth;
@@ -31,6 +32,7 @@ try {
     "022_bulk_place_interns.sql", "023_bulk_placement_date_range.sql",
     "024_placement_requests.sql", "025_placement_request_ranges_and_badges.sql",
   ]) await db.exec(readMigration(file));
+  await db.exec(restore);
   await db.exec(`
     insert into profiles values ('00000000-0000-0000-0000-000000000001','Admin','admin',true,null,null);
     insert into profiles values ('00000000-0000-0000-0000-000000000002','Peserta','intern',true,null,null);

@@ -59,9 +59,9 @@ Uji dengan akun peserta: masuk sekali, ulangi permintaan masuk dan pastikan jam 
 
 ## Penghapusan fitur penempatan anak magang
 
-Fitur penempatan telah dihapus dari aplikasi: menu admin/peserta, kartu jadwal, pengajuan ruangan, dan badge penempatan sudah tidak tersedia. Rilis frontend terbaru dan jalankan `supabase/migrations/026_retire_intern_placements.sql` pada database yang sudah digunakan. Migrasi menonaktifkan akses tabel dan seluruh RPC penempatan untuk `PUBLIC`, `anon`, dan `authenticated`, serta mengeluarkan tabel penempatan dari Realtime agar klien lama tidak lagi dapat menggunakan fitur ini.
+Fitur penempatan telah dihapus dari aplikasi: menu admin/peserta, kartu jadwal, pengajuan ruangan, dan badge penempatan sudah tidak tersedia. Rilis frontend terbaru dan jalankan `supabase/migrations/028_disable_intern_placements.sql` pada database yang sudah digunakan. Migrasi menonaktifkan akses tabel dan seluruh RPC penempatan untuk `PUBLIC`, `anon`, dan `authenticated`, serta mengeluarkan tabel penempatan dari Realtime agar klien lama tidak lagi dapat menggunakan fitur ini.
 
-Data penempatan lama tetap tersimpan sebagai arsip yang dapat diakses administrator database. Data peserta, absensi, izin/sakit, notifikasi lama, dan audit tidak dihapus. Migrasi aman dijalankan ulang, termasuk jika fitur penempatan belum pernah dipasang. Jangan menjalankan ulang migrasi penempatan lama setelah 026 karena dapat membuka kembali akses. `schema.sql` untuk instalasi baru tidak lagi membuat fitur penempatan.
+Data penempatan lama tetap tersimpan sebagai arsip yang dapat diakses administrator database. Data peserta, absensi, izin/sakit, notifikasi lama, dan audit tidak dihapus. Migrasi aman dijalankan ulang, termasuk jika fitur penempatan belum pernah dipasang atau sudah dipulihkan oleh migrasi 027. Jangan menjalankan ulang migrasi penempatan lama setelah 028 karena dapat membuka kembali akses. `schema.sql` untuk instalasi baru tidak lagi membuat fitur penempatan.
 
 Validasi lokal: `node --test tests/*.test.js`, `npm.cmd run build`, dan `node tests/retiredPlacements.database.mjs` dengan PGlite opsional (`PGLITE_MODULE`). Uji database memakai PostgreSQL sementara tanpa mengakses Supabase online.
 
